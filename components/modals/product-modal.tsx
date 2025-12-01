@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { X, Loader2, AlertCircle } from "lucide-react"
 import { productsApi, categoriesApi } from "@/lib/api"
 import type { Product } from "@/lib/api"
+import { authService } from "@/lib/auth"
 
 interface ProductModalProps {
   product?: Product | null
@@ -19,6 +20,10 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
   const [error, setError] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  
+  // Check if user is agent (only agents can set price)
+  const currentUser = authService.getUser()
+  const isAgent = currentUser?.role === "agent"
 
   const [formData, setFormData] = useState({
     name: product?.name || "",
@@ -83,14 +88,24 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
     setLoading(true)
 
     try {
-      const productData = {
+      const productData: any = {
         name: formData.name,
         model: formData.model,
         category: formData.category,
         wattage: formData.wattage || undefined,
-        quantity: formData.quantity,
-        unit_price: formData.price,
+        quantity: formData.quantity || 0,
         image: imageFile || undefined,
+      }
+      
+      // Only include price if user is agent
+      if (isAgent) {
+        productData.unit_price = formData.price || 0
+      } else if (product) {
+        // For super-admin/admin editing, keep existing price if product exists
+        productData.unit_price = product.unit_price || product.price || 0
+      } else {
+        // For super-admin/admin creating new product, set default price to 0
+        productData.unit_price = 0
       }
 
       if (product?.id) {
@@ -183,20 +198,22 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
             </datalist>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Unit Price ($) *</label>
-              <input
-                type="number"
-                name="price"
-                value={formData.price}
-                onChange={handleChange}
-                step="0.01"
-                min="0"
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                required
-              />
-            </div>
+          <div className={`grid grid-cols-1 ${isAgent ? 'sm:grid-cols-2' : ''} gap-4`}>
+            {isAgent && (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Unit Price (₹) *</label>
+                <input
+                  type="number"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  required
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Quantity *</label>
               <input

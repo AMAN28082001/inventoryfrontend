@@ -1,15 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, CheckCircle, Clock, XCircle, ShoppingCart, AlertCircle, TrendingUp, Loader2 } from "lucide-react"
+import { Plus, CheckCircle, Clock, XCircle, ShoppingCart, AlertCircle, TrendingUp, Loader2, RotateCcw, UserPlus, Search } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import AdminStockRequestModal from "@/components/modals/admin-stock-request-modal"
 import EnhancedRequestApprovalModal from "@/components/modals/enhanced-request-approval-modal"
 import StockConfirmationModal from "@/components/modals/stock-confirmation-modal"
+import StockReturnModal from "@/components/modals/stock-return-modal"
+import CreateUserModal from "@/components/modals/create-user-modal"
 import { useStockRequestsState } from "@/hooks/use-stock-requests-state"
-import { authService } from "@/lib/auth"
-import type { StockRequest } from "@/lib/api"
+import { usersApi, stockReturnsApi, productsApi } from "@/lib/api"
+import { authService, type User } from "@/lib/auth"
+import type { StockRequest, StockReturn, Product } from "@/lib/api"
 
 interface AdminDashboardProps {
   userName: string
@@ -21,28 +25,179 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
   const [requestModalType, setRequestModalType] = useState<"super-admin" | "admin-transfer" | null>(null)
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+  const [showStockReturnModal, setShowStockReturnModal] = useState(false)
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState<StockRequest | null>(null)
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "dispatched" | "confirmed" | "rejected">("all")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [myAgents, setMyAgents] = useState<User[]>([])
+  const [loadingAgents, setLoadingAgents] = useState(true)
+  
+  // Stock returns state
+  const [stockReturns, setStockReturns] = useState<StockReturn[]>([])
+  const [loadingReturns, setLoadingReturns] = useState(true)
+  const [processingReturnIds, setProcessingReturnIds] = useState<Set<string>>(new Set())
+  const [returnsSearchQuery, setReturnsSearchQuery] = useState("")
+  const [returnsProducts, setReturnsProducts] = useState<Record<string, Product>>({})
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<string>("overview")
 
   const currentUserId = authService.getUser()?.id
+  const currentUser = authService.getUser()
 
-  // Get requests from agents (where requested_from = "admin")
-  const agentRequests = requests.requests.filter(r => r.requested_from === "admin")
+  // Load agents created by this admin
+  useEffect(() => {
+    const loadMyAgents = async () => {
+      if (!currentUserId) return
+      try {
+        setLoadingAgents(true)
+        // Fetch all agents
+        const allAgents = await usersApi.getAll("agent")
+        // Filter to only agents created by this admin
+        // Check both created_by_id and admin_id fields (backend might use either)
+        const myAgentsList = allAgents.filter(agent => 
+          agent.created_by_id === currentUserId || 
+          agent.admin_id === currentUserId ||
+          // If backend stores creator info in a different way, check that too
+          (agent as any).created_by === currentUserId
+        )
+        setMyAgents(myAgentsList)
+      } catch (err) {
+        console.error("Failed to load agents:", err)
+        // On error, set empty array to avoid showing all agents
+        setMyAgents([])
+      } finally {
+        setLoadingAgents(false)
+      }
+    }
+    loadMyAgents()
+  }, [currentUserId])
+
+  // Load stock returns from agents
+  useEffect(() => {
+    const loadStockReturns = async () => {
+      if (!currentUserId) return
+      try {
+        setLoadingReturns(true)
+        // Fetch all stock returns for this admin (from their agents)
+        // The backend should associate agent returns with their admin_id
+        const allReturns = await stockReturnsApi.getAll({ 
+          admin_id: currentUserId,
+          status: "pending"
+        })
+        setStockReturns(allReturns)
+        
+        // Fetch all products to populate product info
+        const allProducts = await productsApi.getAll()
+        const productsMap: Record<string, Product> = {}
+        allProducts.forEach(p => {
+          productsMap[p.id] = p
+        })
+        setReturnsProducts(productsMap)
+      } catch (err) {
+        console.error("Failed to load stock returns:", err)
+        setStockReturns([])
+      } finally {
+        setLoadingReturns(false)
+      }
+    }
+    loadStockReturns()
+  }, [currentUserId])
+
+  const handleProcessReturn = async (returnId: string) => {
+    try {
+      setProcessingReturnIds((prev) => new Set(prev).add(returnId))
+      await stockReturnsApi.process(returnId)
+      // Reload stock returns to update the list
+      const updatedReturns = await stockReturnsApi.getAll({ 
+        admin_id: currentUserId,
+        status: "pending"
+      })
+      setStockReturns(updatedReturns)
+    } catch (err: any) {
+      console.error("Failed to process stock return:", err)
+      const errorMsg = err?.message || err?.data?.error || "Failed to process stock return. Please try again."
+      alert(errorMsg)
+    } finally {
+      setProcessingReturnIds((prev) => {
+        const next = new Set(prev)
+        next.delete(returnId)
+        return next
+      })
+    }
+  }
+
+  // Get agent IDs created by this admin
+  const myAgentIds = myAgents.map(agent => agent.id)
+
+  // Get requests from agents created by this admin (where requested_from = "admin" AND requested_by_id is in myAgentIds)
+  const agentRequests = requests.requests.filter(r => 
+    r.requested_from === "admin" && 
+    r.requested_by_id && 
+    myAgentIds.includes(r.requested_by_id)
+  )
   
   // Get my requests to super-admin
-  const myRequests = requests.requests.filter(
+  const myRequestsToSuperAdmin = requests.requests.filter(
     r => r.requested_from === "super-admin" && r.requested_by_id === currentUserId
   )
 
-  // Combine for display
-  const allRequests = [...agentRequests, ...myRequests]
-  const filteredRequests = allRequests.filter((r) => {
-    if (statusFilter === "all") return true
-    if (statusFilter === "pending") return r.status === "pending"
-    if (statusFilter === "dispatched") return r.status === "dispatched"
-    if (statusFilter === "confirmed") return r.status === "confirmed"
-    if (statusFilter === "rejected") return r.status === "rejected"
-    return true
+  // Get incoming admin transfer requests (requests sent TO this admin from other admins)
+  // requested_from = currentUserId means this admin is the recipient
+  const incomingAdminTransfers = requests.requests.filter(
+    r => r.requested_from === currentUserId && r.requested_by_id !== currentUserId
+  )
+
+  // Get outgoing admin transfer requests (requests sent BY this admin to other admins)
+  // requested_by_id = currentUserId AND requested_from is an admin ID (not "super-admin" or "admin")
+  const outgoingAdminTransfers = requests.requests.filter(
+    r => r.requested_by_id === currentUserId && 
+         r.requested_from !== "super-admin" && 
+         r.requested_from !== "admin" &&
+         r.requested_from !== currentUserId
+  )
+
+  // Combine all requests for metrics
+  const allRequests = [...agentRequests, ...myRequestsToSuperAdmin, ...incomingAdminTransfers, ...outgoingAdminTransfers]
+  
+  // Sort by date (most recent first - descending order)
+  const sortedRequests = [...allRequests].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return dateB - dateA // Descending order (newest first)
+  })
+
+  const filteredRequests = sortedRequests.filter((r) => {
+    // Filter by status
+    const statusMatch = statusFilter === "all" || r.status === statusFilter
+    
+    // Filter by user search (search in requested_by_name)
+    const userMatch = !searchQuery.trim() || 
+      (r.requested_by_name?.toLowerCase().includes(searchQuery.toLowerCase()) || false)
+    
+    return statusMatch && userMatch
+  })
+
+  // Filter and sort stock returns
+  const filteredStockReturns = stockReturns.filter((ret) => {
+    if (!returnsSearchQuery.trim()) return true
+    const product = returnsProducts[ret.product_id] || ret.product
+    const productName = product?.name || "Unknown"
+    const adminName = ret.admin?.name || "Unknown"
+    return (
+      productName.toLowerCase().includes(returnsSearchQuery.toLowerCase()) ||
+      adminName.toLowerCase().includes(returnsSearchQuery.toLowerCase()) ||
+      ret.reason?.toLowerCase().includes(returnsSearchQuery.toLowerCase()) ||
+      false
+    )
+  })
+
+  // Sort stock returns by date (newest first - descending order)
+  const sortedStockReturns = [...filteredStockReturns].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return dateB - dateA // Descending order (newest first)
   })
 
   const handleCreateRequest = async () => {
@@ -92,7 +247,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
   const inProgress = pending
   const completed = approved + rejected
   const requestsThisMonth = allRequests.filter(
-    (r) => new Date(r.created_at).getMonth() === new Date().getMonth(),
+    (r) => r.created_at ? new Date(r.created_at).getMonth() === new Date().getMonth() : false,
   ).length
 
   if (requests.loading) {
@@ -115,50 +270,61 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="bg-slate-800 border-slate-700 p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+        <Card className="bg-slate-800 border-slate-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-2">Pending</p>
-              <p className="text-3xl font-bold text-amber-500">{pending}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-amber-500">{pending}</p>
             </div>
-            <Clock className="w-8 h-8 text-amber-500 opacity-50" />
+            <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-amber-500 opacity-50 flex-shrink-0" />
           </div>
         </Card>
         <Card className="bg-slate-800 border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-2">Approved</p>
-              <p className="text-3xl font-bold text-green-500">{approved}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-500">{approved}</p>
             </div>
-            <CheckCircle className="w-8 h-8 text-green-500 opacity-50" />
+            <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-500 opacity-50 flex-shrink-0" />
           </div>
         </Card>
         <Card className="bg-slate-800 border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-2">Rejected</p>
-              <p className="text-3xl font-bold text-red-500">{rejected}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-red-500">{rejected}</p>
             </div>
-            <XCircle className="w-8 h-8 text-red-500 opacity-50" />
+            <XCircle className="w-6 h-6 sm:w-8 sm:h-8 text-red-500 opacity-50 flex-shrink-0" />
           </div>
         </Card>
         <Card className="bg-slate-800 border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-2">Total Requested</p>
-              <p className="text-3xl font-bold text-cyan-500">{totalRequested}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-cyan-500">{totalRequested}</p>
             </div>
-            <ShoppingCart className="w-8 h-8 text-cyan-500 opacity-50" />
+            <ShoppingCart className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-500 opacity-50 flex-shrink-0" />
           </div>
         </Card>
         <Card className="bg-slate-800 border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-2">Approval Rate</p>
-              <p className="text-3xl font-bold text-emerald-500">{approvalRate}%</p>
+              <p className="text-2xl sm:text-3xl font-bold text-emerald-500">{approvalRate}%</p>
             </div>
-            <TrendingUp className="w-8 h-8 text-emerald-500 opacity-50" />
+            <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-500 opacity-50 flex-shrink-0" />
+          </div>
+        </Card>
+        <Card className="bg-orange-950/30 border-orange-700 border p-4 sm:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-400 text-sm mb-2 flex items-center gap-1">
+                <RotateCcw className="w-4 h-4" />
+                Stock Returns
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-orange-400">{sortedStockReturns.length}</p>
+            </div>
           </div>
         </Card>
       </div>
@@ -182,20 +348,39 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
         </Card>
       </div>
 
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-slate-800 border border-slate-700 p-1 w-full sm:w-auto">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="returns" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Returns
+          </TabsTrigger>
+          <TabsTrigger value="users" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Users
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-4">
       {/* Main Content */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-xl font-bold text-white">Stock Requests</h2>
-          <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <h2 className="text-lg sm:text-xl font-bold text-white">Stock Requests</h2>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
               onClick={() => {
                 setRequestModalType("super-admin")
                 setShowRequestModal(true)
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base w-full sm:w-auto"
+              size="sm"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Request from Super Admin
+              <span className="whitespace-nowrap">Request from Super Admin</span>
             </Button>
             <Button
               onClick={() => {
@@ -203,18 +388,51 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                 setShowRequestModal(true)
               }}
               variant="outline"
-              className="border-slate-600 text-slate-300"
+              className="border-blue-600 text-blue-400 hover:bg-blue-950 text-sm sm:text-base w-full sm:w-auto"
+              size="sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Transfer to Admin
+            <Plus className="w-4 h-4 mr-2" />
+              <span className="whitespace-nowrap">Transfer to Admin</span>
             </Button>
+            <Button
+              onClick={() => setShowStockReturnModal(true)}
+              variant="outline"
+              className="border-amber-600 text-amber-400 hover:bg-amber-950 text-sm sm:text-base w-full sm:w-auto"
+              size="sm"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              <span className="whitespace-nowrap">Return Stock</span>
+            </Button>
+            <Button
+              onClick={() => setShowCreateUserModal(true)}
+              variant="outline"
+              className="border-slate-600 text-slate-300 hover:bg-slate-700 text-sm sm:text-base w-full sm:w-auto"
+              size="sm"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              <span className="whitespace-nowrap">Create Agent</span>
+          </Button>
           </div>
         </div>
 
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search by User */}
+          <div className="flex-1 relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by user name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          
+          {/* Status Filters */}
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
               statusFilter === "all" ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
             }`}
           >
@@ -222,50 +440,161 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
           </button>
           <button
             onClick={() => setStatusFilter("pending")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
               statusFilter === "pending" ? "bg-amber-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
             }`}
           >
             Pending
           </button>
           <button
-            onClick={() => setStatusFilter("dispatched")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              statusFilter === "dispatched" ? "bg-green-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-            }`}
-          >
-            Dispatched
-          </button>
-          <button
-            onClick={() => setStatusFilter("confirmed")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              statusFilter === "confirmed" ? "bg-cyan-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-            }`}
-          >
-            Confirmed
+              onClick={() => setStatusFilter("dispatched")}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
+                statusFilter === "dispatched" ? "bg-green-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              Dispatched
+            </button>
+            <button
+              onClick={() => setStatusFilter("confirmed")}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
+                statusFilter === "confirmed" ? "bg-cyan-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              Confirmed
           </button>
           <button
             onClick={() => setStatusFilter("rejected")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
               statusFilter === "rejected" ? "bg-red-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
             }`}
           >
             Rejected
           </button>
+          </div>
         </div>
 
-        {/* Requests Table */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+        {/* Requests Table - Mobile Card View / Desktop Table View */}
+        <div className="block lg:hidden space-y-3">
+          {filteredRequests.length > 0 ? (
+            filteredRequests.map((request) => {
+              const isMyRequest = request.requested_by_id === currentUserId
+              const isAgentRequest = request.requested_from === "admin" && !isMyRequest
+              const isIncomingAdminTransfer = request.requested_from === currentUserId && 
+                                              request.requested_by_id !== currentUserId &&
+                                              request.requested_from !== "admin" &&
+                                              request.requested_from !== "super-admin"
+              const isOutgoingAdminTransfer = request.requested_by_id === currentUserId &&
+                                              request.requested_from !== "super-admin" &&
+                                              request.requested_from !== "admin" &&
+                                              request.requested_from !== currentUserId
+              
+              return (
+                <Card key={request.id} className="bg-slate-800 border-slate-700 p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-semibold text-sm truncate">
+                          {request.items?.[0]?.product?.name || "Multiple Products"}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {request.requested_by_name || "Unknown"}
+                          {isIncomingAdminTransfer && " (Admin Transfer)"}
+                          {isOutgoingAdminTransfer && " (To Admin)"}
+                        </p>
+                      </div>
+                      {request.status === "pending" && (
+                        <span className="px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full whitespace-nowrap">
+                          Pending
+                        </span>
+                      )}
+                      {request.status === "dispatched" && (
+                        <span className="px-2 py-1 text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/50 rounded-full whitespace-nowrap">
+                          Dispatched
+                        </span>
+                      )}
+                      {request.status === "confirmed" && (
+                        <span className="px-2 py-1 text-xs font-semibold bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 rounded-full whitespace-nowrap">
+                          Confirmed
+                        </span>
+                      )}
+                      {request.status === "rejected" && (
+                        <span className="px-2 py-1 text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/50 rounded-full whitespace-nowrap">
+                          Rejected
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-slate-400 text-xs">Quantity</p>
+                        <p className="text-white font-bold text-cyan-400">
+                          {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-xs">Date</p>
+                        <p className="text-slate-300">
+                          {request.created_at ? new Date(request.created_at).toLocaleDateString() : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2 border-t border-slate-700">
+                      {(isAgentRequest || isIncomingAdminTransfer) && request.status === "pending" && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedRequest(request)
+                            setShowApprovalModal(true)
+                          }}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                        >
+                          Review
+                        </Button>
+                      )}
+                      {((isMyRequest && request.requested_from === "super-admin") || isOutgoingAdminTransfer) && 
+                       request.status === "dispatched" && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedRequest(request)
+                            setShowConfirmationModal(true)
+                          }}
+                          className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs"
+                        >
+                          Confirm Receipt
+                        </Button>
+                      )}
+                      {request.status === "rejected" && request.rejection_reason && (
+                        <div className="flex items-start gap-2 p-2 bg-red-900/20 rounded">
+                          <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                          <span className="text-xs text-red-300">{request.rejection_reason}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )
+            })
+          ) : (
+            <Card className="bg-slate-800 border-slate-700 p-8 text-center">
+              <p className="text-slate-400">No requests found</p>
+            </Card>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden lg:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-700/50 border-b border-slate-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Product</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Quantity</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Requested By</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Date</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Status</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Actions</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Product</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Quantity</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Requested By</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Date</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Status</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700">
@@ -273,76 +602,97 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                   filteredRequests.map((request) => {
                     const isMyRequest = request.requested_by_id === currentUserId
                     const isAgentRequest = request.requested_from === "admin" && !isMyRequest
+                    // Incoming admin transfer: requests sent TO this admin from another admin
+                    const isIncomingAdminTransfer = request.requested_from === currentUserId && 
+                                                    request.requested_by_id !== currentUserId &&
+                                                    request.requested_from !== "admin" &&
+                                                    request.requested_from !== "super-admin"
+                    // Outgoing admin transfer: requests sent BY this admin to another admin
+                    const isOutgoingAdminTransfer = request.requested_by_id === currentUserId &&
+                                                    request.requested_from !== "super-admin" &&
+                                                    request.requested_from !== "admin" &&
+                                                    request.requested_from !== currentUserId
                     
                     return (
-                      <tr key={request.id} className="hover:bg-slate-700/30 transition">
-                        <td className="px-6 py-4 text-white font-medium">
+                    <tr key={request.id} className="hover:bg-slate-700/30 transition">
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-medium text-sm">
                           {request.items?.[0]?.product?.name || "Multiple Products"}
                         </td>
-                        <td className="px-6 py-4 text-white font-bold text-cyan-400">
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-bold text-cyan-400 text-sm">
                           {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
                         </td>
-                        <td className="px-6 py-4 text-slate-300">
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-300 text-sm">
                           {request.requested_by_name || "Unknown"}
-                        </td>
-                        <td className="px-6 py-4 text-slate-400">
-                          {new Date(request.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          {request.status === "pending" && (
-                            <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
-                              Pending
-                            </span>
+                          {isIncomingAdminTransfer && (
+                            <span className="ml-2 text-xs text-slate-500">(Admin Transfer)</span>
                           )}
+                          {isOutgoingAdminTransfer && (
+                            <span className="ml-2 text-xs text-slate-500">(To Admin)</span>
+                          )}
+                        </td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
+                          {request.created_at ? new Date(request.created_at).toLocaleDateString() : "N/A"}
+                      </td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4">
+                        {request.status === "pending" && (
+                          <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
+                            Pending
+                          </span>
+                        )}
                           {request.status === "dispatched" && (
-                            <span className="px-3 py-1 text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/50 rounded-full">
+                          <span className="px-3 py-1 text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/50 rounded-full">
                               Dispatched
                             </span>
                           )}
                           {request.status === "confirmed" && (
                             <span className="px-3 py-1 text-xs font-semibold bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 rounded-full">
                               Confirmed
-                            </span>
-                          )}
-                          {request.status === "rejected" && (
-                            <span className="px-3 py-1 text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/50 rounded-full">
-                              Rejected
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {isAgentRequest && request.status === "pending" && (
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedRequest(request)
-                                setShowApprovalModal(true)
-                              }}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              Review
-                            </Button>
-                          )}
-                          {isMyRequest && request.status === "dispatched" && (
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedRequest(request)
-                                setShowConfirmationModal(true)
-                              }}
-                              className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                            >
-                              Confirm Receipt
-                            </Button>
-                          )}
-                          {request.status === "rejected" && request.rejection_reason && (
-                            <div className="flex items-start gap-2">
-                              <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                              <span className="text-xs text-red-300">{request.rejection_reason}</span>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
+                          </span>
+                        )}
+                        {request.status === "rejected" && (
+                          <span className="px-3 py-1 text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/50 rounded-full">
+                            Rejected
+                          </span>
+                        )}
+                      </td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4">
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            {/* Show Review button for agent requests or incoming admin transfers that are pending */}
+                            {(isAgentRequest || isIncomingAdminTransfer) && request.status === "pending" && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedRequest(request)
+                                  setShowApprovalModal(true)
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                              >
+                                Review
+                              </Button>
+                            )}
+                            {/* Show Confirm Receipt button for my requests (to super-admin or outgoing admin transfers) that are dispatched */}
+                            {((isMyRequest && request.requested_from === "super-admin") || isOutgoingAdminTransfer) && 
+                             request.status === "dispatched" && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedRequest(request)
+                                  setShowConfirmationModal(true)
+                                }}
+                                className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs"
+                              >
+                                Confirm Receipt
+                              </Button>
+                            )}
+                            {request.status === "rejected" && request.rejection_reason && (
+                              <div className="flex items-start gap-2 max-w-xs">
+                            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                                <span className="text-xs text-red-300">{request.rejection_reason}</span>
+                              </div>
+                            )}
+                          </div>
+                      </td>
+                    </tr>
                     )
                   })
                 ) : (
@@ -371,7 +721,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                     <p className="text-sm text-white font-medium">
                       {request.items?.[0]?.product?.name || "Multiple Products"}
                     </p>
-                    <p className="text-xs text-slate-400">{new Date(request.created_at).toLocaleDateString()}</p>
+                    <p className="text-xs text-slate-400">{request.created_at ? new Date(request.created_at).toLocaleDateString() : "N/A"}</p>
                   </div>
                   <span className="text-sm font-bold text-cyan-400">
                     {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
@@ -426,6 +776,188 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
           </Card>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="returns" className="mt-4">
+      {/* Stock Returns Section */}
+      {sortedStockReturns.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-orange-500" />
+              Stock Returns from Agents
+            </h2>
+          </div>
+
+          {/* Search for Stock Returns */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by product name, agent name, or reason..."
+              value={returnsSearchQuery}
+              onChange={(e) => setReturnsSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="block lg:hidden space-y-3">
+            {sortedStockReturns.map((ret) => {
+              const product = returnsProducts[ret.product_id] || ret.product
+              const productName = product?.name || "Unknown Product"
+              const productModel = product?.model || ""
+              const agentName = ret.admin?.name || "Unknown Agent"
+              return (
+                <Card key={ret.id} className="bg-slate-800 border-slate-700 p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-semibold text-sm">{productName} {productModel && `- ${productModel}`}</p>
+                        <p className="text-xs text-slate-400 mt-1">From: {agentName}</p>
+                      </div>
+                      <span className="px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full whitespace-nowrap">
+                        Pending
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-slate-400 text-xs">Quantity</p>
+                        <p className="text-white font-bold text-cyan-400">{ret.quantity}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-xs">Date</p>
+                        <p className="text-slate-300 text-sm">
+                          {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    {ret.reason && (
+                      <div>
+                        <p className="text-slate-400 text-xs">Reason</p>
+                        <p className="text-slate-300 text-sm">{ret.reason}</p>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-slate-700">
+                      <Button
+                        size="sm"
+                        onClick={() => handleProcessReturn(ret.id)}
+                        disabled={processingReturnIds.has(ret.id)}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                      >
+                        {processingReturnIds.has(ret.id) ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Approve Return
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-700/50 border-b border-slate-700">
+                  <tr>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Product</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Quantity</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Returned By</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Reason</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Date</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700">
+                  {sortedStockReturns.map((ret) => {
+                    const product = returnsProducts[ret.product_id] || ret.product
+                    const productName = product?.name || "Unknown Product"
+                    const productModel = product?.model || ""
+                    const agentName = ret.admin?.name || "Unknown Agent"
+                    return (
+                      <tr key={ret.id} className="hover:bg-slate-700/30 transition">
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-medium text-sm">
+                          {productName} {productModel && `- ${productModel}`}
+                        </td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-bold text-cyan-400 text-sm">{ret.quantity}</td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-300 text-sm">{agentName}</td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm max-w-xs truncate">{ret.reason || "N/A"}</td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
+                          {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                        </td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4">
+                          <Button
+                            size="sm"
+                            onClick={() => handleProcessReturn(ret.id)}
+                            disabled={processingReturnIds.has(ret.id)}
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                          >
+                            {processingReturnIds.has(ret.id) ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <Card className="bg-slate-800 border-slate-700 p-6 text-center">
+          <RotateCcw className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+          <p className="text-slate-400 text-lg font-semibold mb-2">No Stock Returns</p>
+          <p className="text-slate-500 text-sm">There are no pending stock returns from agents at the moment.</p>
+        </Card>
+      )}
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-4">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-purple-500" />
+                User Management
+              </h2>
+              <Button
+                onClick={() => setShowCreateUserModal(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create Agent
+              </Button>
+            </div>
+
+            <Card className="bg-slate-800 border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Create New Agent User</h3>
+              <p className="text-slate-400 mb-4">
+                Create a new agent user. The agent will need approval from the super-admin before they can login.
+              </p>
+              <Button
+                onClick={() => setShowCreateUserModal(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create Agent
+              </Button>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       {showRequestModal && requestModalType && (
@@ -458,6 +990,24 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
           onClose={() => {
             setShowConfirmationModal(false)
             setSelectedRequest(null)
+          }}
+        />
+      )}
+      {showStockReturnModal && (
+        <StockReturnModal
+          userRole="admin"
+          onClose={() => setShowStockReturnModal(false)}
+          onSuccess={async () => {
+            setShowStockReturnModal(false)
+          }}
+        />
+      )}
+      {showCreateUserModal && (
+        <CreateUserModal
+          creatorRole="admin"
+          onClose={() => setShowCreateUserModal(false)}
+          onSuccess={async () => {
+            setShowCreateUserModal(false)
           }}
         />
       )}

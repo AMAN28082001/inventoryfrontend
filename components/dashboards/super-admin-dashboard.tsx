@@ -1,16 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit2, Trash2, Package, Search, TrendingUp, AlertCircle, Loader2 } from "lucide-react"
+import { Plus, Edit2, Trash2, Package, Search, TrendingUp, AlertCircle, Loader2, UserPlus, Users, CheckCircle, XCircle, RotateCcw } from "lucide-react"
 import ProductModal from "@/components/modals/product-modal"
 import EnhancedRequestApprovalModal from "@/components/modals/enhanced-request-approval-modal"
+import CreateUserModal from "@/components/modals/create-user-modal"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useInventoryState } from "@/hooks/use-inventory-state"
 import { useStockRequestsState } from "@/hooks/use-stock-requests-state"
-import { productsApi, stockRequestsApi, categoriesApi } from "@/lib/api"
+import { productsApi, stockRequestsApi, categoriesApi, usersApi, stockReturnsApi } from "@/lib/api"
+import { authService, type User } from "@/lib/auth"
 import type { Product } from "@/lib/api"
-import type { StockRequest } from "@/lib/api"
+import type { StockRequest, StockReturn } from "@/lib/api"
 
 interface SuperAdminDashboardProps {
   userName: string
@@ -22,12 +25,30 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
   
   const [showProductModal, setShowProductModal] = useState(false)
   const [showApprovalModal, setShowApprovalModal] = useState(false)
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState<StockRequest | null>(null)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [categories, setCategories] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [requestsSearchQuery, setRequestsSearchQuery] = useState("")
+  
+  // Agent approval state
+  const [pendingAgents, setPendingAgents] = useState<User[]>([])
+  const [loadingAgents, setLoadingAgents] = useState(true)
+  const [processingAgentIds, setProcessingAgentIds] = useState<Set<string>>(new Set())
+  const [agentsSearchQuery, setAgentsSearchQuery] = useState("")
+  
+  // Stock returns state
+  const [stockReturns, setStockReturns] = useState<StockReturn[]>([])
+  const [loadingReturns, setLoadingReturns] = useState(true)
+  const [processingReturnIds, setProcessingReturnIds] = useState<Set<string>>(new Set())
+  const [returnsSearchQuery, setReturnsSearchQuery] = useState("")
+  const [returnsProducts, setReturnsProducts] = useState<Record<string, Product>>({})
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<string>("overview")
 
   // Load categories
   useEffect(() => {
@@ -41,6 +62,117 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
     }
     loadCategories()
   }, [])
+
+  // Load pending agents (agents created by admins that need approval)
+  const loadPendingAgents = useCallback(async () => {
+    try {
+      setLoadingAgents(true)
+      // Fetch all agents
+      const allAgents = await usersApi.getAll("agent")
+      // Filter for inactive agents (those needing approval) created by admins
+      // Only show agents that are not active and were created by admins
+      const pending = allAgents.filter(agent => 
+        (agent.is_active === false || agent.is_active === undefined || agent.is_active === null) &&
+        // Check if agent was created by an admin (not super-admin or account)
+        (agent.created_by_id || agent.admin_id) // Has a creator/admin relationship
+      )
+      setPendingAgents(pending)
+    } catch (err) {
+      console.error("Failed to load pending agents:", err)
+      setPendingAgents([])
+    } finally {
+      setLoadingAgents(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadPendingAgents()
+  }, [loadPendingAgents])
+
+  // Load all stock returns
+  const loadStockReturns = useCallback(async () => {
+    try {
+      setLoadingReturns(true)
+      // Fetch ALL pending stock returns (from all admins and agents)
+      const allReturns = await stockReturnsApi.getAll({ status: "pending" })
+      setStockReturns(allReturns)
+      
+      // Fetch all products to populate product info
+      const allProducts = await productsApi.getAll()
+      const productsMap: Record<string, Product> = {}
+      allProducts.forEach(p => {
+        productsMap[p.id] = p
+      })
+      setReturnsProducts(productsMap)
+    } catch (err) {
+      console.error("Failed to load stock returns:", err)
+      setStockReturns([])
+    } finally {
+      setLoadingReturns(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadStockReturns()
+  }, [loadStockReturns])
+
+  const handleProcessReturn = async (returnId: string) => {
+    try {
+      setProcessingReturnIds((prev) => new Set(prev).add(returnId))
+      await stockReturnsApi.process(returnId)
+      // Reload stock returns to update the list
+      await loadStockReturns()
+    } catch (err: any) {
+      console.error("Failed to process stock return:", err)
+      const errorMsg = err?.message || err?.data?.error || "Failed to process stock return. Please try again."
+      alert(errorMsg)
+    } finally {
+      setProcessingReturnIds((prev) => {
+        const next = new Set(prev)
+        next.delete(returnId)
+        return next
+      })
+    }
+  }
+
+  const handleApproveAgent = async (agentId: string) => {
+    try {
+      setProcessingAgentIds((prev) => new Set(prev).add(agentId))
+      await usersApi.update(agentId, { is_active: true })
+      // Reload pending agents to update the list
+      await loadPendingAgents()
+    } catch (err: any) {
+      console.error("Failed to approve agent:", err)
+      const errorMsg = err?.message || err?.data?.error || "Failed to approve agent. Please try again."
+      alert(errorMsg)
+    } finally {
+      setProcessingAgentIds((prev) => {
+        const next = new Set(prev)
+        next.delete(agentId)
+        return next
+      })
+    }
+  }
+
+  const handleRejectAgent = async (agentId: string) => {
+    try {
+      setProcessingAgentIds((prev) => new Set(prev).add(agentId))
+      // Keep is_active as false (rejected)
+      await usersApi.update(agentId, { is_active: false })
+      // Reload pending agents to update the list
+      await loadPendingAgents()
+    } catch (err: any) {
+      console.error("Failed to reject agent:", err)
+      const errorMsg = err?.message || err?.data?.error || "Failed to reject agent. Please try again."
+      alert(errorMsg)
+    } finally {
+      setProcessingAgentIds((prev) => {
+        const next = new Set(prev)
+        next.delete(agentId)
+        return next
+      })
+    }
+  }
 
   const filteredProducts = inventory.products.filter((p) => {
     const matchesSearch =
@@ -77,41 +209,75 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
   }
 
   const handleApproveRequest = async () => {
-    if (!selectedRequest) return
-    
-    try {
-      await requests.approveRequest(selectedRequest.id)
-      await requests.refetch()
-      setShowApprovalModal(false)
-      setSelectedRequest(null)
-    } catch (err) {
-      console.error("Failed to approve request:", err)
-    }
+    // The modal handles the approval itself, we just need to refetch and close
+    await requests.refetch()
+    setShowApprovalModal(false)
+    setSelectedRequest(null)
   }
 
   const handleRejectRequest = async () => {
-    if (!selectedRequest) return
-    
-    try {
-      await requests.rejectRequest(selectedRequest.id, "Rejected by super admin")
-      await requests.refetch()
-      setShowApprovalModal(false)
-      setSelectedRequest(null)
-    } catch (err) {
-      console.error("Failed to reject request:", err)
-    }
+    // The modal handles the rejection itself, we just need to refetch and close
+    await requests.refetch()
+    setShowApprovalModal(false)
+    setSelectedRequest(null)
   }
 
   // Filter requests from admins only
   const adminRequests = requests.requests.filter(r => r.requested_from === "super-admin")
-  const pendingRequests = adminRequests.filter((r) => r.status === "pending").length
-  const dispatchedRequests = adminRequests.filter((r) => r.status === "dispatched").length
-  const confirmedRequests = adminRequests.filter((r) => r.status === "confirmed").length
-  const rejectedRequests = adminRequests.filter((r) => r.status === "rejected").length
+  
+  // Sort requests by date (most recent first)
+  const sortedAdminRequests = [...adminRequests].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return dateB - dateA // Descending order (newest first)
+  })
+  
+  // Filter requests by user search
+  const filteredAdminRequests = sortedAdminRequests.filter((r) => {
+    if (!requestsSearchQuery.trim()) return true
+    return r.requested_by_name?.toLowerCase().includes(requestsSearchQuery.toLowerCase()) || false
+  })
+  
+  const pendingRequests = filteredAdminRequests.filter((r) => r.status === "pending").length
+  const dispatchedRequests = filteredAdminRequests.filter((r) => r.status === "dispatched").length
+  const confirmedRequests = filteredAdminRequests.filter((r) => r.status === "confirmed").length
+  const rejectedRequests = filteredAdminRequests.filter((r) => r.status === "rejected").length
   
   const totalProducts = inventory.products.length
-  const totalValue = inventory.products.reduce((sum, p) => sum + (p.quantity || 0) * (p.price || 0), 0)
+  // Price calculation removed - not shown to super-admin
+  // const totalValue = inventory.products.reduce((sum, p) => sum + (p.quantity || 0) * (p.price || 0), 0)
   const lowStockProducts = inventory.products.filter((p) => (p.quantity || 0) < 50).length
+
+  // Filter pending agents by search
+  const filteredPendingAgents = pendingAgents.filter((agent) => {
+    if (!agentsSearchQuery.trim()) return true
+    return (
+      agent.name?.toLowerCase().includes(agentsSearchQuery.toLowerCase()) ||
+      agent.username?.toLowerCase().includes(agentsSearchQuery.toLowerCase()) ||
+      false
+    )
+  })
+
+  // Filter stock returns by search
+  const filteredStockReturns = stockReturns.filter((ret) => {
+    if (!returnsSearchQuery.trim()) return true
+    const product = returnsProducts[ret.product_id]
+    const productName = product?.name || "Unknown"
+    const adminName = ret.admin?.name || "Unknown"
+    return (
+      productName.toLowerCase().includes(returnsSearchQuery.toLowerCase()) ||
+      adminName.toLowerCase().includes(returnsSearchQuery.toLowerCase()) ||
+      ret.reason?.toLowerCase().includes(returnsSearchQuery.toLowerCase()) ||
+      false
+    )
+  })
+
+  // Sort stock returns by date (newest first)
+  const sortedStockReturns = [...filteredStockReturns].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return dateB - dateA // Descending order (newest first)
+  })
 
   if (inventory.loading || requests.loading) {
     return (
@@ -133,34 +299,66 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="bg-slate-800 border-slate-700 p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+        <Card className="bg-slate-800 border-slate-700 p-4 sm:p-6">
           <p className="text-slate-400 text-sm mb-2">Total Products</p>
-          <p className="text-3xl font-bold text-white">{totalProducts}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-white">{totalProducts}</p>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-6">
-          <p className="text-slate-400 text-sm mb-2">Inventory Value</p>
-          <p className="text-3xl font-bold text-white">${(totalValue / 1000).toFixed(1)}K</p>
-        </Card>
-        <Card className="bg-amber-950/30 border-amber-700 border p-6">
+        <Card className="bg-amber-950/30 border-amber-700 border p-4 sm:p-6">
           <p className="text-slate-400 text-sm mb-2">Pending Requests</p>
-          <p className="text-3xl font-bold text-amber-500">{pendingRequests}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-amber-500">{pendingRequests}</p>
         </Card>
-        <Card className="bg-cyan-950/30 border-cyan-700 border p-6">
+        <Card className="bg-cyan-950/30 border-cyan-700 border p-4 sm:p-6">
           <p className="text-slate-400 text-sm mb-2">Total Stock</p>
-          <p className="text-3xl font-bold text-cyan-400">
+          <p className="text-2xl sm:text-3xl font-bold text-cyan-400">
             {inventory.products.reduce((sum, p) => sum + (p.quantity || 0), 0)}
           </p>
         </Card>
-        <Card className="bg-red-950/30 border-red-700 border p-6">
+        <Card className="bg-red-950/30 border-red-700 border p-4 sm:p-6">
           <p className="text-slate-400 text-sm mb-2 flex items-center gap-1">
             <AlertCircle className="w-4 h-4" />
             Low Stock
           </p>
-          <p className="text-3xl font-bold text-red-400">{lowStockProducts}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-red-400">{lowStockProducts}</p>
+        </Card>
+        <Card className="bg-purple-950/30 border-purple-700 border p-4 sm:p-6">
+          <p className="text-slate-400 text-sm mb-2 flex items-center gap-1">
+            <Users className="w-4 h-4" />
+            Pending Agents
+          </p>
+          <p className="text-2xl sm:text-3xl font-bold text-purple-400">{filteredPendingAgents.length}</p>
+        </Card>
+        <Card className="bg-orange-950/30 border-orange-700 border p-4 sm:p-6">
+          <p className="text-slate-400 text-sm mb-2 flex items-center gap-1">
+            <RotateCcw className="w-4 h-4" />
+            Return Approvals
+          </p>
+          <p className="text-2xl sm:text-3xl font-bold text-orange-400">{sortedStockReturns.length}</p>
         </Card>
       </div>
 
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-slate-800 border border-slate-700 p-1 w-full sm:w-auto">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <Package className="w-4 h-4 mr-2" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="approvals" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Approvals
+          </TabsTrigger>
+          <TabsTrigger value="returns" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Return Approvals
+          </TabsTrigger>
+          <TabsTrigger value="users" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Users
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products Management */}
         <div className="lg:col-span-2 space-y-4">
@@ -169,6 +367,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
               <Package className="w-5 h-5 text-blue-500" />
               Products Catalog
             </h2>
+            <div className="flex gap-2 flex-wrap">
             <Button
               onClick={() => {
                 setEditingProduct(null)
@@ -179,6 +378,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
               <Plus className="w-4 h-4 mr-2" />
               Add Product
             </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -215,7 +415,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                     <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-0">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-white mb-1 truncate">{product.name}</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 text-sm">
                           <div>
                             <p className="text-slate-400 text-xs">Model</p>
                             <p className="text-white truncate">{product.model}</p>
@@ -229,10 +429,6 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                             <p className={`font-semibold ${(product.quantity || 0) < 50 ? "text-red-400" : "text-cyan-400"}`}>
                               {product.quantity || 0}
                             </p>
-                          </div>
-                          <div>
-                            <p className="text-slate-400 text-xs">Price</p>
-                            <p className="text-white font-semibold">${product.price || product.unit_price || 0}</p>
                           </div>
                         </div>
                       </div>
@@ -258,7 +454,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                           {isDeleting === product.id ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                           )}
                         </Button>
                       </div>
@@ -301,8 +497,21 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
           </div>
 
           <h2 className="text-lg font-bold text-white mt-6">Recent Requests</h2>
+          
+          {/* Search by User */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by admin name..."
+              value={requestsSearchQuery}
+              onChange={(e) => setRequestsSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
-            {adminRequests.slice(0, 10).map((request) => (
+            {filteredAdminRequests.slice(0, 10).map((request) => (
               <Card
                 key={request.id}
                 className={`border-l-4 p-3 ${
@@ -312,7 +521,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                       ? "bg-green-950/30 border-l-green-500 border border-slate-700"
                       : request.status === "confirmed"
                         ? "bg-cyan-950/30 border-l-cyan-500 border border-slate-700"
-                        : "bg-red-950/30 border-l-red-500 border border-slate-700"
+                      : "bg-red-950/30 border-l-red-500 border border-slate-700"
                 }`}
               >
                 <div className="flex items-start justify-between mb-2">
@@ -329,33 +538,459 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                     "bg-red-500 text-red-950"
                   }`}>
                     {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                  </span>
+                    </span>
                 </div>
                 <p className="text-white font-bold text-xs mb-2">
                   Qty: {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
                 </p>
                 {request.status === "pending" && (
-                  <button
-                    onClick={() => {
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
                       setSelectedRequest(request)
                       setShowApprovalModal(true)
                     }}
-                    className="w-full text-xs text-blue-400 hover:text-blue-300 underline"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white text-xs mt-2"
                   >
                     Review & Dispatch
-                  </button>
+                  </Button>
                 )}
                 {request.status === "rejected" && request.rejection_reason && (
                   <p className="text-xs text-red-300 mt-1">Reason: {request.rejection_reason}</p>
                 )}
               </Card>
             ))}
-            {adminRequests.length === 0 && (
+            {filteredAdminRequests.length === 0 && (
               <p className="text-slate-400 text-sm text-center py-4">No requests yet</p>
             )}
           </div>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="approvals" className="mt-4 space-y-6">
+      {/* Stock Requests List */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-amber-500" />
+            Stock Requests
+          </h2>
+        </div>
+
+        {/* Search by User */}
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by admin name..."
+            value={requestsSearchQuery}
+            onChange={(e) => setRequestsSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        <div className="space-y-3">
+          {filteredAdminRequests.map((request) => (
+            <Card
+              key={request.id}
+              className={`border-l-4 p-3 ${
+                request.status === "pending"
+                  ? "bg-amber-950/30 border-l-amber-500 border border-slate-700"
+                  : request.status === "dispatched"
+                    ? "bg-green-950/30 border-l-green-500 border border-slate-700"
+                    : request.status === "confirmed"
+                      ? "bg-cyan-950/30 border-l-cyan-500 border border-slate-700"
+                      : "bg-red-950/30 border-l-red-500 border border-slate-700"
+              }`}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <p className="font-semibold text-white text-sm">
+                    {request.items?.[0]?.product?.name || "Multiple Products"}
+                  </p>
+                  <p className="text-xs text-slate-400">From: {request.requested_by_name || "Admin"}</p>
+                </div>
+                <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                  request.status === "pending" ? "bg-amber-500 text-amber-950" :
+                  request.status === "dispatched" ? "bg-green-500 text-green-950" :
+                  request.status === "confirmed" ? "bg-cyan-500 text-cyan-950" :
+                  "bg-red-500 text-red-950"
+                }`}>
+                  {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                </span>
+              </div>
+              <p className="text-white font-bold text-xs mb-2">
+                Qty: {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
+              </p>
+              {request.status === "pending" && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setSelectedRequest(request)
+                    setShowApprovalModal(true)
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white text-xs mt-2"
+                >
+                  Review & Dispatch
+                </Button>
+              )}
+              {request.status === "rejected" && request.rejection_reason && (
+                <p className="text-xs text-red-300 mt-1">Reason: {request.rejection_reason}</p>
+              )}
+            </Card>
+          ))}
+          {filteredAdminRequests.length === 0 && (
+            <Card className="bg-slate-800 border-slate-700 p-4 text-center">
+              <p className="text-slate-400">No stock requests found</p>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Pending Agent Approvals Section */}
+      {filteredPendingAgents.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-purple-500" />
+              Pending Agent Approvals
+            </h2>
+          </div>
+
+          {/* Search for Agents */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search agents by name or username..."
+              value={agentsSearchQuery}
+              onChange={(e) => setAgentsSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="block lg:hidden space-y-3">
+            {filteredPendingAgents.map((agent) => (
+              <Card key={agent.id} className="bg-slate-800 border-slate-700 p-4">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold text-sm">{agent.name}</p>
+                      <p className="text-xs text-slate-400 mt-1">@{agent.username}</p>
+                    </div>
+                    <span className="px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full whitespace-nowrap">
+                      Pending
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs">Created Date</p>
+                    <p className="text-slate-300 text-sm">
+                      {agent.created_at ? new Date(agent.created_at).toLocaleDateString() : "N/A"}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-700 flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleApproveAgent(agent.id)}
+                      disabled={processingAgentIds.has(agent.id)}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                    >
+                      {processingAgentIds.has(agent.id) ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Approve
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleRejectAgent(agent.id)}
+                      disabled={processingAgentIds.has(agent.id)}
+                      variant="outline"
+                      className="w-full border-red-600 text-red-400 hover:bg-red-950 text-xs"
+                    >
+                      {processingAgentIds.has(agent.id) ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Reject
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-700/50 border-b border-slate-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Name</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Username</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Created Date</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Status</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700">
+                  {filteredPendingAgents.map((agent) => (
+                    <tr key={agent.id} className="hover:bg-slate-700/30 transition">
+                      <td className="px-6 py-4 text-white font-medium">{agent.name}</td>
+                      <td className="px-6 py-4 text-slate-300">{agent.username}</td>
+                      <td className="px-6 py-4 text-slate-400">
+                        {agent.created_at ? new Date(agent.created_at).toLocaleDateString() : "N/A"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
+                          Pending Approval
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproveAgent(agent.id)}
+                            disabled={processingAgentIds.has(agent.id)}
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                          >
+                            {processingAgentIds.has(agent.id) ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleRejectAgent(agent.id)}
+                            disabled={processingAgentIds.has(agent.id)}
+                            variant="outline"
+                            className="border-red-600 text-red-400 hover:bg-red-950 text-xs"
+                          >
+                            {processingAgentIds.has(agent.id) ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Reject
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <Card className="bg-slate-800 border-slate-700 p-6 text-center">
+          <Users className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+          <p className="text-slate-400 text-lg font-semibold mb-2">No Pending Agent Approvals</p>
+          <p className="text-slate-500 text-sm">All agents have been approved or there are no pending agent creation requests.</p>
+        </Card>
+      )}
+        </TabsContent>
+
+        <TabsContent value="returns" className="mt-4">
+      {/* Stock Returns Section */}
+      {sortedStockReturns.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-orange-500" />
+              Stock Return Approvals
+            </h2>
+          </div>
+
+          {/* Search for Stock Returns */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by product name, returned by, or reason..."
+              value={returnsSearchQuery}
+              onChange={(e) => setReturnsSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="block lg:hidden space-y-3">
+            {sortedStockReturns.map((ret) => {
+              const product = returnsProducts[ret.product_id] || ret.product
+              const productName = product?.name || "Unknown Product"
+              const productModel = product?.model || ""
+              const adminName = ret.admin?.name || "Unknown Admin"
+              return (
+                <Card key={ret.id} className="bg-slate-800 border-slate-700 p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-semibold text-sm">{productName} {productModel && `- ${productModel}`}</p>
+                        <p className="text-xs text-slate-400 mt-1">From: {adminName}</p>
+                      </div>
+                      <span className="px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full whitespace-nowrap">
+                        Pending
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-slate-400 text-xs">Quantity</p>
+                        <p className="text-white font-bold text-cyan-400">{ret.quantity}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-xs">Date</p>
+                        <p className="text-slate-300 text-sm">
+                          {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    {ret.reason && (
+                      <div>
+                        <p className="text-slate-400 text-xs">Reason</p>
+                        <p className="text-slate-300 text-sm">{ret.reason}</p>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-slate-700">
+                      <Button
+                        size="sm"
+                        onClick={() => handleProcessReturn(ret.id)}
+                        disabled={processingReturnIds.has(ret.id)}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                      >
+                        {processingReturnIds.has(ret.id) ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Approve Return
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-700/50 border-b border-slate-700">
+                  <tr>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Product</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Quantity</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Returned By</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Reason</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Date</th>
+                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700">
+                  {sortedStockReturns.map((ret) => {
+                    const product = returnsProducts[ret.product_id] || ret.product
+                    const productName = product?.name || "Unknown Product"
+                    const productModel = product?.model || ""
+                    const adminName = ret.admin?.name || "Unknown Admin"
+                    return (
+                      <tr key={ret.id} className="hover:bg-slate-700/30 transition">
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-medium text-sm">
+                          {productName} {productModel && `- ${productModel}`}
+                        </td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-bold text-cyan-400 text-sm">{ret.quantity}</td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-300 text-sm">{adminName}</td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm max-w-xs truncate">{ret.reason || "N/A"}</td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
+                          {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                        </td>
+                        <td className="px-4 xl:px-6 py-3 xl:py-4">
+                          <Button
+                            size="sm"
+                            onClick={() => handleProcessReturn(ret.id)}
+                            disabled={processingReturnIds.has(ret.id)}
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                          >
+                            {processingReturnIds.has(ret.id) ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <Card className="bg-slate-800 border-slate-700 p-6 text-center">
+          <RotateCcw className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+          <p className="text-slate-400 text-lg font-semibold mb-2">No Pending Return Approvals</p>
+          <p className="text-slate-500 text-sm">There are no pending stock returns awaiting approval at the moment.</p>
+        </Card>
+      )}
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-4">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-purple-500" />
+                User Management
+              </h2>
+              <Button
+                onClick={() => setShowCreateUserModal(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create Admin
+              </Button>
+            </div>
+
+            <Card className="bg-slate-800 border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Create New Admin User</h3>
+              <p className="text-slate-400 mb-4">
+                Create a new admin user who can manage agents and stock requests.
+              </p>
+              <Button
+                onClick={() => setShowCreateUserModal(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create Admin
+              </Button>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       {showProductModal && (
@@ -377,6 +1012,15 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
           onClose={() => {
             setShowApprovalModal(false)
             setSelectedRequest(null)
+          }}
+        />
+      )}
+      {showCreateUserModal && (
+        <CreateUserModal
+          creatorRole="super-admin"
+          onClose={() => setShowCreateUserModal(false)}
+          onSuccess={async () => {
+            setShowCreateUserModal(false)
           }}
         />
       )}

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { X, Loader2, AlertCircle } from "lucide-react"
 import { productsApi, salesApi } from "@/lib/api"
 import type { Product, SaleItem } from "@/lib/api"
+import AddressFields, { type Address } from "@/components/forms/address-fields"
 
 interface SalesModalProps {
   saleType: "b2b" | "b2c"
@@ -23,6 +24,16 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
 
   const [items, setItems] = useState<Array<{ product_id: string; quantity: number; unit_price: number; gst_rate: number }>>([])
 
+  // Address structure matching the Address model
+  const emptyAddress: Address = {
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+    postal_code: "",
+    country: "",
+  }
+
   // B2B fields
   const [b2bFields, setB2bFields] = useState({
     customer_name: "",
@@ -31,8 +42,8 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
     contact_person: "",
     customer_email: "",
     customer_phone: "",
-    billing_address: "",
-    delivery_address: "",
+    billing_address: { ...emptyAddress },
+    delivery_address: { ...emptyAddress },
     delivery_matches_billing: false,
   })
 
@@ -41,8 +52,8 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
     customer_name: "",
     customer_email: "",
     customer_phone: "",
-    billing_address: "",
-    delivery_address: "",
+    billing_address: { ...emptyAddress },
+    delivery_address: { ...emptyAddress },
     delivery_matches_billing: false,
   })
 
@@ -133,6 +144,20 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
         setError("Please fill all required B2B fields")
         return
       }
+      // Validate billing address
+      const billing = b2bFields.billing_address
+      if (!billing.line1 || !billing.city || !billing.state || !billing.postal_code || !billing.country) {
+        setError("Please fill all required billing address fields")
+        return
+      }
+      // Validate delivery address if different
+      if (!b2bFields.delivery_matches_billing) {
+        const delivery = b2bFields.delivery_address
+        if (!delivery.line1 || !delivery.city || !delivery.state || !delivery.postal_code || !delivery.country) {
+          setError("Please fill all required delivery address fields")
+          return
+        }
+      }
     }
 
     // Validate B2C fields
@@ -140,6 +165,20 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
       if (!b2cFields.customer_name || !b2cFields.customer_phone) {
         setError("Please fill all required B2C fields")
         return
+      }
+      // Validate billing address
+      const billing = b2cFields.billing_address
+      if (!billing.line1 || !billing.city || !billing.state || !billing.postal_code || !billing.country) {
+        setError("Please fill all required billing address fields")
+        return
+      }
+      // Validate delivery address if different
+      if (!b2cFields.delivery_matches_billing) {
+        const delivery = b2cFields.delivery_address
+        if (!delivery.line1 || !delivery.city || !delivery.state || !delivery.postal_code || !delivery.country) {
+          setError("Please fill all required delivery address fields")
+          return
+        }
       }
     }
 
@@ -171,16 +210,22 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
         saleData.contact_person = b2bFields.contact_person
         saleData.customer_email = b2bFields.customer_email || undefined
         saleData.customer_phone = b2bFields.customer_phone || undefined
-        saleData.billing_address_id = b2bFields.billing_address || undefined
-        saleData.delivery_address_id = b2bFields.delivery_matches_billing ? undefined : (b2bFields.delivery_address || undefined)
+        // Send address objects - backend will create them
+        saleData.billing_address = b2bFields.billing_address
+        if (!b2bFields.delivery_matches_billing) {
+          saleData.delivery_address = b2bFields.delivery_address
+        }
       }
 
       // Add B2C specific fields
       if (saleType === "b2c") {
         saleData.customer_email = b2cFields.customer_email || undefined
         saleData.customer_phone = b2cFields.customer_phone
-        saleData.billing_address_id = b2cFields.billing_address || undefined
-        saleData.delivery_address_id = b2cFields.delivery_matches_billing ? undefined : (b2cFields.delivery_address || undefined)
+        // Send address objects - backend will create them
+        saleData.billing_address = b2cFields.billing_address
+        if (!b2cFields.delivery_matches_billing) {
+          saleData.delivery_address = b2cFields.delivery_address
+        }
       }
 
       const created = await salesApi.create(saleData)
@@ -297,36 +342,38 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Billing Address</label>
-                <textarea
-                  value={b2bFields.billing_address}
-                  onChange={(e) => setB2bFields({ ...b2bFields, billing_address: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
-                />
-              </div>
+              <AddressFields
+                address={b2bFields.billing_address}
+                onChange={(address) => setB2bFields({ ...b2bFields, billing_address: address })}
+                label="Billing Address"
+                required
+              />
               
-              <div>
+          <div>
                 <label className="flex items-center gap-2 text-sm text-slate-300">
                   <input
                     type="checkbox"
                     checked={b2bFields.delivery_matches_billing}
-                    onChange={(e) => setB2bFields({ ...b2bFields, delivery_matches_billing: e.target.checked })}
+                    onChange={(e) => {
+                      setB2bFields({ 
+                        ...b2bFields, 
+                        delivery_matches_billing: e.target.checked,
+                        delivery_address: e.target.checked ? { ...b2bFields.billing_address } : { ...emptyAddress }
+                      })
+                    }}
                     className="rounded"
                   />
                   Delivery address same as billing address
-                </label>
+            </label>
               </div>
               
               {!b2bFields.delivery_matches_billing && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Delivery Address</label>
-                  <textarea
-                    value={b2bFields.delivery_address}
-                    onChange={(e) => setB2bFields({ ...b2bFields, delivery_address: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
-                  />
-                </div>
+                <AddressFields
+                  address={b2bFields.delivery_address}
+                  onChange={(address) => setB2bFields({ ...b2bFields, delivery_address: address })}
+                  label="Delivery Address"
+                  required
+                />
               )}
             </div>
           ) : (
@@ -336,23 +383,23 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Customer Name *</label>
-                  <input
-                    type="text"
+            <input
+              type="text"
                     value={b2cFields.customer_name}
                     onChange={(e) => setB2cFields({ ...b2cFields, customer_name: e.target.value })}
                     className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    required
-                  />
-                </div>
-                
-                <div>
+              required
+            />
+          </div>
+
+          <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Phone *</label>
                   <input
                     type="tel"
                     value={b2cFields.customer_phone}
                     onChange={(e) => setB2cFields({ ...b2cFields, customer_phone: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    required
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              required
                   />
                 </div>
                 
@@ -367,21 +414,25 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Billing Address</label>
-                <textarea
-                  value={b2cFields.billing_address}
-                  onChange={(e) => setB2cFields({ ...b2cFields, billing_address: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
-                />
-              </div>
+              <AddressFields
+                address={b2cFields.billing_address}
+                onChange={(address) => setB2cFields({ ...b2cFields, billing_address: address })}
+                label="Billing Address"
+                required
+              />
               
               <div>
                 <label className="flex items-center gap-2 text-sm text-slate-300">
                   <input
                     type="checkbox"
                     checked={b2cFields.delivery_matches_billing}
-                    onChange={(e) => setB2cFields({ ...b2cFields, delivery_matches_billing: e.target.checked })}
+                    onChange={(e) => {
+                      setB2cFields({ 
+                        ...b2cFields, 
+                        delivery_matches_billing: e.target.checked,
+                        delivery_address: e.target.checked ? { ...b2cFields.billing_address } : { ...emptyAddress }
+                      })
+                    }}
                     className="rounded"
                   />
                   Delivery address same as billing address
@@ -389,14 +440,12 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
               </div>
               
               {!b2cFields.delivery_matches_billing && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Delivery Address</label>
-                  <textarea
-                    value={b2cFields.delivery_address}
-                    onChange={(e) => setB2cFields({ ...b2cFields, delivery_address: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
-                  />
-                </div>
+                <AddressFields
+                  address={b2cFields.delivery_address}
+                  onChange={(address) => setB2cFields({ ...b2cFields, delivery_address: address })}
+                  label="Delivery Address"
+                  required
+                />
               )}
             </div>
           )}
@@ -423,35 +472,35 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
                     value={item.product_id}
                     onChange={(e) => updateItem(index, "product_id", e.target.value)}
                     className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    required
-                  >
+              required
+            >
                     <option value="">Select Product</option>
-                    {products.map((product) => (
+              {products.map((product) => (
                       <option key={product.id} value={product.id}>
-                        {product.name} - {product.model}
-                      </option>
-                    ))}
-                  </select>
+                  {product.name} - {product.model}
+                </option>
+              ))}
+            </select>
                   <div className="flex gap-2">
-                    <input
-                      type="number"
+              <input
+                type="number"
                       value={item.quantity || ""}
                       onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
                       placeholder="Qty"
-                      min="1"
+                min="1"
                       className="w-20 sm:w-24 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
-                      required
-                    />
-                    <input
-                      type="number"
+                required
+              />
+              <input
+                type="number"
                       value={item.unit_price || ""}
                       onChange={(e) => updateItem(index, "unit_price", parseFloat(e.target.value) || 0)}
                       placeholder="Price"
                       step="0.01"
                       min="0"
                       className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
-                      required
-                    />
+                required
+              />
                     <input
                       type="number"
                       value={item.gst_rate || ""}
@@ -486,15 +535,15 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
             <div className="bg-slate-700/50 p-4 rounded-lg space-y-2">
               <div className="flex justify-between text-slate-300">
                 <span>Subtotal:</span>
-                <span>${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span>₹{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-slate-300">
                 <span>Tax (GST):</span>
-                <span>${taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span>₹{taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-lg font-bold text-white border-t border-slate-600 pt-2">
                 <span>Total:</span>
-                <span className="text-emerald-400">${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-emerald-400">₹{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
           )}

@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { X, Upload, Image as ImageIcon, Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import type { StockRequest } from "@/lib/api"
-import { stockRequestsApi } from "@/lib/api"
+import { stockRequestsApi, productsApi, type Product } from "@/lib/api"
 import { formatImageUrl } from "@/lib/utils"
 
 interface StockConfirmationModalProps {
@@ -19,6 +19,36 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fullRequest, setFullRequest] = useState<StockRequest>(request)
+  const [products, setProducts] = useState<Record<string, Product>>({})
+  const [loading, setLoading] = useState(true)
+
+  // Fetch full request details and products
+  useEffect(() => {
+    const loadFullDetails = async () => {
+      try {
+        setLoading(true)
+        // Fetch the full request with populated product data
+        const fullRequestData = await stockRequestsApi.getById(request.id)
+        setFullRequest(fullRequestData)
+
+        // Fetch all products to populate missing product info
+        const allProducts = await productsApi.getAll()
+        const productsMap: Record<string, Product> = {}
+        allProducts.forEach(p => {
+          productsMap[p.id] = p
+        })
+        setProducts(productsMap)
+      } catch (err) {
+        console.error("Failed to load request details:", err)
+        // Fallback to original request
+        setFullRequest(request)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadFullDetails()
+  }, [request.id])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -86,25 +116,37 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
             <div>
               <p className="text-slate-400 text-sm">Items Received</p>
               <div className="space-y-2 mt-2">
-                {request.items?.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center p-2 bg-slate-600/50 rounded">
-                    <div>
-                      <p className="text-white font-medium">
-                        {item.product?.name || "Unknown Product"} - {item.product?.model || ""}
-                      </p>
-                    </div>
-                    <p className="text-cyan-400 font-bold">{item.quantity} units</p>
+                {loading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
                   </div>
-                ))}
+                ) : (
+                  fullRequest.items?.map((item, index) => {
+                    // Try to get product info from item.product first, then from products map
+                    const product = item.product || products[item.product_id]
+                    const productName = product?.name || "Unknown Product"
+                    const productModel = product?.model || ""
+                    return (
+                      <div key={index} className="flex justify-between items-center p-2 bg-slate-600/50 rounded">
+                        <div>
+                          <p className="text-white font-medium">
+                            {productName} {productModel && `- ${productModel}`}
+                          </p>
+                        </div>
+                        <p className="text-cyan-400 font-bold">{item.quantity} units</p>
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </div>
 
-            {request.dispatch_image && (
+            {fullRequest.dispatch_image && (
               <div>
                 <p className="text-slate-400 text-sm mb-2">Dispatch Image</p>
                 <div className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-600">
                   <img
-                    src={formatImageUrl(request.dispatch_image)}
+                    src={formatImageUrl(fullRequest.dispatch_image)}
                     alt="Dispatch image"
                     className="w-full h-full object-cover"
                   />
@@ -112,10 +154,10 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
               </div>
             )}
 
-            {request.dispatched_at && (
+            {fullRequest.dispatched_at && (
               <div>
                 <p className="text-slate-400 text-sm">Dispatched On</p>
-                <p className="text-white">{new Date(request.dispatched_at).toLocaleString()}</p>
+                <p className="text-white">{new Date(fullRequest.dispatched_at).toLocaleString()}</p>
               </div>
             )}
           </div>
@@ -145,10 +187,10 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
               </div>
             )}
 
-            {request.confirmation_image && !imagePreview && (
+            {fullRequest.confirmation_image && !imagePreview && (
               <div className="relative w-full h-64 rounded-lg overflow-hidden border border-slate-600">
                 <img
-                  src={formatImageUrl(request.confirmation_image)}
+                  src={formatImageUrl(fullRequest.confirmation_image)}
                   alt="Current confirmation image"
                   className="w-full h-full object-cover"
                 />
@@ -159,7 +201,7 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
               </div>
             )}
 
-            {!imagePreview && !request.confirmation_image && (
+            {!imagePreview && !fullRequest.confirmation_image && (
               <div className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center">
                 <ImageIcon className="w-16 h-16 text-slate-500 mx-auto mb-4" />
                 <label className="cursor-pointer">
@@ -186,7 +228,7 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
           </div>
 
           {/* Action Buttons */}
-          {!request.confirmation_image && (
+          {!fullRequest.confirmation_image && (
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <Button
                 type="button"
@@ -217,13 +259,13 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
             </div>
           )}
 
-          {request.confirmation_image && (
+          {fullRequest.confirmation_image && (
             <div className="p-4 bg-green-950/30 border border-green-700 rounded-lg">
               <p className="text-green-400 text-sm text-center">
                 ✓ Stock receipt has been confirmed
               </p>
               <p className="text-slate-400 text-xs text-center mt-1">
-                Confirmed on {new Date(request.confirmed_at || "").toLocaleString()}
+                Confirmed on {fullRequest.confirmed_at ? new Date(fullRequest.confirmed_at).toLocaleString() : "N/A"}
               </p>
             </div>
           )}

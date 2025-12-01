@@ -3,10 +3,11 @@
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Users, ShoppingCart, CreditCard, TrendingUp, BarChart3, Target, Loader2 } from "lucide-react"
+import { Plus, Users, ShoppingCart, CreditCard, TrendingUp, BarChart3, Target, Loader2, RotateCcw, Search } from "lucide-react"
 import SalesModal from "@/components/modals/sales-modal"
 import AgentStockRequestModal from "@/components/modals/agent-stock-request-modal"
 import StockConfirmationModal from "@/components/modals/stock-confirmation-modal"
+import StockReturnModal from "@/components/modals/stock-return-modal"
 import { useSalesState } from "@/hooks/use-sales-state"
 import { useStockRequestsState } from "@/hooks/use-stock-requests-state"
 import { authService } from "@/lib/auth"
@@ -23,18 +24,55 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
   const [showSalesModal, setShowSalesModal] = useState(false)
   const [showStockRequestModal, setShowStockRequestModal] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+  const [showStockReturnModal, setShowStockReturnModal] = useState(false)
   const [saleType, setSaleType] = useState<"b2b" | "b2c" | null>(null)
   const [filterType, setFilterType] = useState<"all" | "B2B" | "B2C">("all")
   const [selectedRequest, setSelectedRequest] = useState<StockRequest | null>(null)
+  const [salesSearchQuery, setSalesSearchQuery] = useState("")
+  const [requestsSearchQuery, setRequestsSearchQuery] = useState("")
 
   const currentUserId = authService.getUser()?.id
 
   // Filter my stock requests
   const myRequests = requests.requests.filter(r => r.requested_by_id === currentUserId)
-  const pendingRequests = myRequests.filter(r => r.status === "pending")
-  const dispatchedRequests = myRequests.filter(r => r.status === "dispatched")
+  
+  // Sort requests by date (most recent first)
+  const sortedRequests = [...myRequests].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return dateB - dateA // Descending order (newest first)
+  })
+  
+  // Filter and sort requests by search query
+  const filteredAndSortedRequests = sortedRequests.filter((r) => {
+    if (!requestsSearchQuery.trim()) return true
+    // Search in requested_by_name or notes
+    return r.requested_by_name?.toLowerCase().includes(requestsSearchQuery.toLowerCase()) ||
+           r.notes?.toLowerCase().includes(requestsSearchQuery.toLowerCase()) ||
+           false
+  })
+  
+  const pendingRequests = filteredAndSortedRequests.filter(r => r.status === "pending")
+  const dispatchedRequests = filteredAndSortedRequests.filter(r => r.status === "dispatched")
 
-  const filteredSales = sales.sales.filter((s) => filterType === "all" || s.type === filterType)
+  // Sort sales by date (most recent first)
+  const sortedSales = [...sales.sales].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 
+                  a.saleDate ? new Date(a.saleDate).getTime() : 0
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 
+                  b.saleDate ? new Date(b.saleDate).getTime() : 0
+    return dateB - dateA // Descending order (newest first)
+  })
+
+  // Filter sales by type and customer search
+  const filteredSales = sortedSales.filter((s) => {
+    const typeMatch = filterType === "all" || s.type === filterType
+    const customerMatch = !salesSearchQuery.trim() || 
+      (s.customer_name?.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
+       s.customerName?.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
+       false)
+    return typeMatch && customerMatch
+  })
 
   const handleCreateSale = async (newSale: Sale | Omit<Sale, "id">) => {
     try {
@@ -109,7 +147,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-2">Total Revenue</p>
-              <p className="text-2xl font-bold text-emerald-400">${(totalRevenue / 1000).toFixed(1)}K</p>
+              <p className="text-2xl font-bold text-emerald-400">₹{(totalRevenue / 1000).toFixed(1)}K</p>
             </div>
             <TrendingUp className="w-8 h-8 text-emerald-400 opacity-50" />
           </div>
@@ -136,7 +174,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-2">Pending Payments</p>
-              <p className="text-2xl font-bold text-amber-400">${(pendingAmount / 1000).toFixed(1)}K</p>
+              <p className="text-2xl font-bold text-amber-400">₹{(pendingAmount / 1000).toFixed(1)}K</p>
             </div>
             <CreditCard className="w-8 h-8 text-amber-400 opacity-50" />
           </div>
@@ -206,15 +244,29 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
           </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setFilterType("all")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filterType === "all" ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-            }`}
-          >
-            All Sales
-          </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search by Customer */}
+          <div className="flex-1 relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by customer name..."
+              value={salesSearchQuery}
+              onChange={(e) => setSalesSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          
+          {/* Type Filters */}
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setFilterType("all")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                filterType === "all" ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              All Sales
+            </button>
           <button
             onClick={() => setFilterType("B2B")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
@@ -231,6 +283,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
           >
             B2C
           </button>
+          </div>
         </div>
 
         {/* Sales Table */}
@@ -263,7 +316,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-white font-bold text-emerald-400">
-                        ${(sale.totalAmount || sale.total_amount || 0).toLocaleString()}
+                        ₹{(sale.totalAmount || sale.total_amount || 0).toLocaleString()}
                       </td>
                       <td className="px-6 py-4">
                         {sale.paymentStatus === "pending" ? (
@@ -277,7 +330,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                         )}
                       </td>
                       <td className="px-6 py-4 text-slate-400">
-                        {new Date(sale.saleDate || sale.created_at || "").toLocaleDateString()}
+                        {(sale.saleDate || sale.created_at) ? new Date(sale.saleDate || sale.created_at || "").toLocaleDateString() : "N/A"}
                       </td>
                     </tr>
                   ))
@@ -301,7 +354,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
             <BarChart3 className="w-5 h-5 text-blue-400" />
             <span className="text-xs text-slate-400">B2B Revenue</span>
           </div>
-          <p className="text-2xl font-bold text-white">${(b2bRevenue / 1000).toFixed(1)}K</p>
+          <p className="text-2xl font-bold text-white">₹{(b2bRevenue / 1000).toFixed(1)}K</p>
           <p className="text-xs text-slate-400 mt-1">{b2bSales.length} transactions</p>
         </Card>
         <Card className="bg-slate-800 border-slate-700 p-4">
@@ -309,7 +362,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
             <Target className="w-5 h-5 text-cyan-400" />
             <span className="text-xs text-slate-400">B2C Revenue</span>
           </div>
-          <p className="text-2xl font-bold text-white">${(b2cRevenue / 1000).toFixed(1)}K</p>
+          <p className="text-2xl font-bold text-white">₹{(b2cRevenue / 1000).toFixed(1)}K</p>
           <p className="text-xs text-slate-400 mt-1">{b2cSales.length} transactions</p>
         </Card>
         <Card className="bg-slate-800 border-slate-700 p-4">
@@ -317,7 +370,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
             <TrendingUp className="w-5 h-5 text-emerald-400" />
             <span className="text-xs text-slate-400">Avg. Sale Value</span>
           </div>
-          <p className="text-2xl font-bold text-white">${averageSaleValue.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-white">₹{averageSaleValue.toLocaleString()}</p>
           <p className="text-xs text-slate-400 mt-1">
             {topProduct ? `Top: ${topProduct[0]}` : "No sales yet"}
           </p>
@@ -325,11 +378,26 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
       </div>
 
       {/* Stock Requests */}
-      {myRequests.length > 0 && (
+      {filteredAndSortedRequests.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-white">My Stock Requests</h2>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <h2 className="text-xl font-bold text-white">My Stock Requests</h2>
+          </div>
+          
+          {/* Search for Stock Requests */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search requests by user or notes..."
+              value={requestsSearchQuery}
+              onChange={(e) => setRequestsSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          
           <div className="space-y-2">
-            {myRequests.slice(0, 5).map((request) => (
+            {filteredAndSortedRequests.slice(0, 5).map((request) => (
               <Card
                 key={request.id}
                 className={`border-l-4 p-3 ${
@@ -349,7 +417,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                     </p>
                     <p className="text-xs text-slate-400">
                       Qty: {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0} •{" "}
-                      {new Date(request.created_at).toLocaleDateString()}
+                      {request.created_at ? new Date(request.created_at).toLocaleDateString() : "N/A"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -412,6 +480,15 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
           onClose={() => {
             setShowConfirmationModal(false)
             setSelectedRequest(null)
+          }}
+        />
+      )}
+      {showStockReturnModal && (
+        <StockReturnModal
+          userRole="agent"
+          onClose={() => setShowStockReturnModal(false)}
+          onSuccess={async () => {
+            setShowStockReturnModal(false)
           }}
         />
       )}

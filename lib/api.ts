@@ -19,6 +19,26 @@ export const usersApi = {
     return apiClient.get<User[]>("/users", params)
   },
 
+  async getAgents(): Promise<User[]> {
+    // Try specific endpoint for agents first
+    try {
+      return await apiClient.get<User[]>("/users/agents")
+    } catch (err) {
+      // Fallback to role filter
+      try {
+        return await apiClient.get<User[]>("/users", { role: "agent" })
+      } catch (err2) {
+        // Try alternative endpoint for account role
+        try {
+          return await apiClient.get<User[]>("/account/agents")
+        } catch (err3) {
+          // Re-throw the original error
+          throw err
+        }
+      }
+    }
+  },
+
   async getById(id: string): Promise<User> {
     return apiClient.get<User>(`/users/${id}`)
   },
@@ -28,6 +48,7 @@ export const usersApi = {
     password: string
     name: string
     role: string
+    is_active?: boolean
   }): Promise<User> {
     return apiClient.post<User>("/users", user)
   },
@@ -98,8 +119,8 @@ export const productsApi = {
     formData.append("model", product.model)
     formData.append("category", product.category)
     if (product.wattage) formData.append("wattage", product.wattage)
-    formData.append("quantity", product.quantity.toString())
-    formData.append("unit_price", product.unit_price.toString())
+    formData.append("quantity", (product.quantity ?? 0).toString())
+    formData.append("unit_price", (product.unit_price ?? 0).toString())
     if (product.image) formData.append("image", product.image)
 
     return apiClient.post<Product>("/products", formData, true)
@@ -152,7 +173,7 @@ export interface StockRequestItem {
 
 export interface StockRequest {
   id: string
-  requested_from: "super-admin" | "admin"
+  requested_from: "super-admin" | string  // Can be "super-admin" or admin ID string
   requested_by_id: string
   requested_by_name?: string
   items: Array<{
@@ -193,9 +214,32 @@ export const stockRequestsApi = {
   },
 
   async create(request: {
-    requested_from: "super-admin" | "admin"
+    requested_from: "super-admin" | string  // Can be "super-admin" or admin ID for admin-to-admin transfers
     items: StockRequestItem[]
     notes?: string
+    billing_address?: {
+      line1: string
+      line2?: string
+      city: string
+      state: string
+      postal_code: string
+      country: string
+    }
+    delivery_address?: {
+      line1: string
+      line2?: string
+      city: string
+      state: string
+      postal_code: string
+      country: string
+    }
+    customer_name?: string
+    company_name?: string
+    gst_number?: string
+    contact_person?: string
+    customer_email?: string
+    customer_phone?: string
+    request_type?: "b2b" | "b2c"
   }): Promise<StockRequest> {
     return apiClient.post<StockRequest>("/stock-requests", request)
   },
@@ -328,6 +372,22 @@ export const salesApi = {
       discount_amount?: number
       billing_address_id?: string
       delivery_address_id?: string
+      billing_address?: {
+        line1: string
+        line2?: string
+        city: string
+        state: string
+        postal_code: string
+        country: string
+      }
+      delivery_address?: {
+        line1: string
+        line2?: string
+        city: string
+        state: string
+        postal_code: string
+        country: string
+      }
       delivery_matches_billing?: boolean
       company_name?: string
       gst_number?: string
@@ -375,7 +435,7 @@ export interface InventoryTransaction {
   id: string
   product_id: string
   product?: Product
-  transaction_type: "purchase" | "sale" | "adjustment" | "return" | "stock_request"
+  transaction_type: "purchase" | "sale" | "adjustment" | "return" | "transfer"
   quantity: number
   reference: string
   notes?: string

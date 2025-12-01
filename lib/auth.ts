@@ -6,6 +6,8 @@ export interface User {
   is_active?: boolean
   created_at?: string
   updated_at?: string
+  created_by_id?: string  // ID of the admin who created this agent
+  admin_id?: string  // For agents: the admin ID they belong to
 }
 
 export interface LoginResponse {

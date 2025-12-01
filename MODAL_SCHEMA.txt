@@ -1,0 +1,882 @@
+================================================================================
+                        MODAL SCHEMA DOCUMENTATION
+                    Chairbord Solar Inventory Management
+                    Based on Backend Database Models & API
+================================================================================
+
+This document describes the complete schema structure for all modals used in the 
+application, matching the backend Sequelize models and API endpoints.
+
+Base URL: http://localhost:3000/api (or http://localhost:3001/api based on .env)
+
+================================================================================
+1. ADDRESS SCHEMA (Database Model: Address)
+================================================================================
+
+Location: components/forms/address-fields.tsx
+Database Table: addresses
+
+Database Structure:
+{
+  id: STRING(50)           // Primary Key
+  line1: STRING(255)       // Required - Street address, P.O. box
+  line2: STRING(255)       // Optional - Apartment, suite, unit, building, floor
+  city: STRING(120)        // Required
+  state: STRING(120)       // Required - State/Province
+  postal_code: STRING(30)  // Required - Postal/ZIP Code
+  country: STRING(120)     // Required - Country name
+  created_at: DATE         // Timestamp (auto-generated)
+}
+
+Frontend Interface:
+{
+  line1: string
+  line2: string
+  city: string
+  state: string
+  postal_code: string
+  country: string
+}
+
+Validation Rules:
+- line1: Required, max 255 characters
+- city: Required, max 120 characters
+- state: Required, max 120 characters
+- postal_code: Required, max 30 characters
+- country: Required, max 120 characters
+- line2: Optional, max 255 characters
+
+API Usage:
+- Addresses are created automatically when sending address objects in sales/requests
+- Addresses are referenced by ID (billing_address_id, delivery_address_id) in Sales model
+- No direct Address API endpoint exists - addresses are created via Sales/StockRequests
+
+================================================================================
+2. PRODUCT MODAL SCHEMA (Database Model: Product)
+================================================================================
+
+Location: components/modals/product-modal.tsx
+Database Table: products
+
+Props:
+{
+  product?: Product | null
+  onClose: () => void
+  onSave: (product: Product | Omit<Product, "id">) => void
+}
+
+Database Structure:
+{
+  id: STRING(50)           // Primary Key
+  name: STRING(255)        // Required
+  model: STRING(255)       // Required
+  category: STRING(255)    // Required
+  wattage: STRING(255)     // Optional
+  unit_price: DECIMAL      // Required (but hidden for super-admin/admin in UI)
+  central_stock: INTEGER   // Required (default: 0)
+  distributed_stock: INTEGER // Calculated (default: 0)
+  total_stock: INTEGER     // Calculated (default: 0)
+  image: STRING(500)       // Optional - Image filename/URL
+  created_at: DATE         // Timestamp
+  updated_at: DATE         // Timestamp
+}
+
+Form Data Structure (Frontend):
+{
+  name: string             // Required - Product Name
+  model: string            // Required - Model
+  wattage: string          // Optional - e.g., "400W"
+  price: number            // Conditional - Required for agents only
+                           // Maps to unit_price in database
+                           // Hidden for super-admin and admin roles
+  quantity: number         // Required - Maps to central_stock
+                           // Must be >= 0
+  category: string         // Required - e.g., "Panels", "Inverter", "Battery"
+  image: string | File     // Optional - Product image (max 5MB)
+}
+
+API Endpoints:
+- GET /api/products - Get all products (Public, no auth required)
+  Query Params: category (optional), search (optional)
+  
+- GET /api/products/:id - Get product by ID (Public)
+  
+- GET /api/products/inventory/levels - Get inventory levels (Auth required)
+  Response: { id, name, model, category, central_stock, distributed_stock, total_stock }
+  
+- POST /api/products - Create product (Role: super-admin only)
+  Content-Type: multipart/form-data (if image) or application/json
+  Request Body: { name, model, category, wattage, quantity, unit_price, image? }
+  
+- PUT /api/products/:id - Update product (Role: super-admin only)
+  
+- DELETE /api/products/:id - Delete product (Role: super-admin only)
+
+Role-Based Access:
+- Super-Admin: Can create/edit/delete products, but CANNOT see/edit price field
+- Admin: Cannot access product management endpoints
+- Agent: Can see products but cannot create/edit/delete
+         Price field visible when creating sales (unit_price)
+
+Validation Rules:
+- name: Required, non-empty, max 255 characters
+- model: Required, non-empty, max 255 characters
+- category: Required, non-empty, max 255 characters
+- quantity: Required, >= 0, maps to central_stock
+- unit_price: Required for agents, >= 0, hidden from super-admin/admin
+- image: Optional, max 5MB, image types only (JPEG, JPG, PNG, GIF)
+- wattage: Optional, max 255 characters
+
+File Upload:
+- Max size: 5MB
+- Types: image/* (JPEG, JPG, PNG, GIF)
+- Uploaded files accessible at: http://localhost:3000/uploads/<filename>
+
+================================================================================
+3. SALES MODAL SCHEMA (Database Model: Sale, SaleItem)
+================================================================================
+
+Location: components/modals/sales-modal.tsx
+Database Tables: sales, sale_items, addresses (for billing/delivery)
+
+Props:
+{
+  saleType: "b2b" | "b2c"
+  onClose: () => void
+  onSave: (sale: any) => void
+}
+
+Database Structure - Sale Table:
+{
+  id: STRING(50)                    // Primary Key
+  type: ENUM('B2B', 'B2C')         // Required
+  customer_name: STRING(255)        // Required
+  product_summary: STRING(500)      // Auto-generated from items
+  total_quantity: INTEGER           // Auto-calculated
+  subtotal: DECIMAL(15,2)          // Auto-calculated
+  tax_amount: DECIMAL(15,2)        // Required, default: 0
+  discount_amount: DECIMAL(15,2)   // Required, default: 0
+  total_amount: DECIMAL(15,2)      // Auto-calculated
+  payment_status: ENUM('pending', 'completed') // Default: 'pending'
+  sale_date: DATE                  // Default: NOW
+  image: STRING(500)                // Optional - Sale image
+  created_by: STRING(50)            // Optional - Creator user ID
+  company_name: STRING(255)         // Optional - B2B only
+  gst_number: STRING(50)            // Optional - B2B only
+  contact_person: STRING(255)       // Optional - B2B only
+  billing_address_id: STRING(50)    // Optional - FK to addresses
+  delivery_address_id: STRING(50)   // Optional - FK to addresses
+  delivery_matches_billing: BOOLEAN // Optional
+  customer_email: STRING(255)       // Optional - Valid email format
+  customer_phone: STRING(50)        // Optional
+  delivery_instructions: TEXT       // Optional
+  bill_image: STRING(500)           // Optional - Bill image
+  bill_confirmed_date: DATE         // Optional
+  bill_confirmed_by_id: STRING(50)  // Optional
+  bill_confirmed_by_name: STRING(255) // Optional
+  notes: TEXT                       // Optional
+}
+
+Database Structure - SaleItem Table:
+{
+  id: STRING(50)                    // Primary Key
+  sale_id: STRING(50)               // Required - FK to sales
+  product_id: STRING(50)            // Optional - FK to products
+  product_name: STRING(255)         // Required
+  model: STRING(255)                // Required
+  quantity: INTEGER                 // Required, min: 1
+  unit_price: DECIMAL(12,2)        // Required, min: 0
+  line_total: DECIMAL(15,2)        // Auto-calculated
+  gst_rate: DECIMAL(5,2)           // Required, default: 0, min: 0
+}
+
+Frontend Form Structure:
+
+B2B Fields:
+{
+  customer_name: string                    // Required
+  company_name: string                     // Required for B2B
+  gst_number: string                       // Optional
+  contact_person: string                   // Required for B2B
+  customer_email: string                   // Optional
+  customer_phone: string                   // Optional
+  billing_address: Address                 // Required - Full address structure
+  delivery_address: Address                // Required if delivery_matches_billing = false
+  delivery_matches_billing: boolean        // If true, delivery_address = billing_address
+}
+
+B2C Fields:
+{
+  customer_name: string                    // Required
+  customer_email: string                   // Optional
+  customer_phone: string                   // Required for B2C
+  billing_address: Address                 // Required - Full address structure
+  delivery_address: Address                // Required if delivery_matches_billing = false
+  delivery_matches_billing: boolean        // If true, delivery_address = billing_address
+}
+
+Sale Items Array:
+[
+  {
+    product_id: string                     // Required
+    quantity: number                       // Required, > 0
+    unit_price: number                     // Required, > 0 (agent sets this)
+    gst_rate: number                       // Optional, default: 0, >= 0 (GST percentage)
+  }
+]
+
+Additional Fields:
+{
+  notes: string                            // Optional
+  image: File                              // Optional - Sale/bill image (max 5MB)
+}
+
+API Request Structure (POST /api/sales):
+{
+  type: "B2B" | "B2C"                     // Required
+  customer_name: string                    // Required
+  items: [                                 // Required - Array of sale items
+    {
+      product_id: string                   // Required
+      quantity: number                     // Required, min: 1
+      unit_price: number                   // Required, min: 0
+      gst_rate: number                     // Optional, default: 0, min: 0
+    }
+  ]
+  tax_amount: number                       // Required - Calculated from items
+  discount_amount: number                  // Optional, default: 0
+  billing_address: Address                 // Required - Address object (creates address record)
+  delivery_address?: Address               // Optional if delivery_matches_billing = true
+  delivery_matches_billing: boolean        // Required
+  
+  // B2B Specific (if type = "B2B"):
+  company_name: string                     // Required
+  gst_number?: string                      // Optional
+  contact_person: string                   // Required
+  customer_email?: string                  // Optional, must be valid email
+  customer_phone?: string                  // Optional
+  
+  // B2C Specific (if type = "B2C"):
+  customer_email?: string                  // Optional, must be valid email
+  customer_phone: string                   // Required
+  
+  notes?: string                           // Optional
+  image?: File                             // Optional - multipart/form-data
+}
+
+API Endpoints:
+- GET /api/sales - Get all sales (Auth required)
+  Query Params: type (B2B/B2C), payment_status (pending/completed), 
+                customer_name, start_date, end_date
+  
+- GET /api/sales/summary - Get sales summary (Auth required)
+  Response: [{ type, payment_status, sale_count, total_quantity, total_revenue, total_subtotal }]
+  
+- GET /api/sales/:id - Get sale by ID (Auth required)
+  
+- POST /api/sales - Create sale (Role: agent, admin)
+  Content-Type: multipart/form-data (if image) or application/json
+  Request Body: See API Request Structure above
+  
+- PUT /api/sales/:id - Update sale (Creator, admin, or super-admin)
+  
+- POST /api/sales/:id/confirm-bill - Confirm B2B bill (Role: account)
+  Content-Type: multipart/form-data
+  Request Body: { bill_image: File }
+  
+- DELETE /api/sales/:id - Delete sale (Creator or super-admin)
+
+Validation Rules:
+B2B:
+- customer_name: Required
+- company_name: Required
+- contact_person: Required
+- billing_address: All required fields (line1, city, state, postal_code, country)
+- delivery_address: All required fields if delivery_matches_billing = false
+- customer_email: Optional, must be valid email format if provided
+
+B2C:
+- customer_name: Required
+- customer_phone: Required
+- billing_address: All required fields
+- delivery_address: All required fields if delivery_matches_billing = false
+- customer_email: Optional, must be valid email format if provided
+
+Items:
+- At least one item required
+- product_id: Required
+- quantity: Required, min: 1
+- unit_price: Required, min: 0
+- gst_rate: Optional, default: 0, min: 0
+
+Calculations:
+- subtotal = sum of (quantity * unit_price) for all items
+- tax_amount = sum of (quantity * unit_price * gst_rate / 100) for all items
+- total_amount = subtotal + tax_amount - discount_amount
+- total_quantity = sum of quantities for all items
+
+================================================================================
+4. AGENT STOCK REQUEST MODAL SCHEMA
+================================================================================
+
+Location: components/modals/agent-stock-request-modal.tsx
+Database Tables: stock_requests, stock_request_items, addresses
+
+Props:
+{
+  onClose: () => void
+  onSuccess: () => void
+}
+
+Database Structure - StockRequest Table:
+{
+  id: STRING(50)                    // Primary Key
+  primary_product_id: STRING(50)    // Optional - Legacy field
+  primary_product_name: STRING(255) // Optional - Legacy field
+  primary_model: STRING(255)        // Optional - Legacy field
+  total_quantity: INTEGER           // Required, min: 1 - Auto-calculated
+  requested_by_id: STRING(50)       // Optional - FK to users
+  requested_by_name: STRING(255)    // Required
+  requested_by_role: ENUM('admin', 'agent') // Required
+  requested_from: STRING(50)        // Required - "super-admin" or admin ID
+  requested_from_role: ENUM('super-admin', 'admin') // Required
+  status: ENUM('pending', 'dispatched', 'confirmed', 'rejected') // Default: 'pending'
+  rejection_reason: TEXT            // Optional
+  requested_date: DATE              // Default: NOW
+  dispatched_date: DATE             // Optional
+  confirmed_date: DATE              // Optional
+  dispatch_image: STRING(500)       // Optional
+  confirmation_image: STRING(500)   // Optional
+  dispatched_by_id: STRING(50)      // Optional
+  dispatched_by_name: STRING(255)   // Optional
+  confirmed_by_id: STRING(50)       // Optional
+  confirmed_by_name: STRING(255)    // Optional
+  notes: TEXT                       // Optional
+}
+
+Database Structure - StockRequestItem Table:
+{
+  id: STRING(50)                    // Primary Key
+  stock_request_id: STRING(50)      // Required - FK to stock_requests
+  product_id: STRING(50)            // Optional - FK to products
+  product_name: STRING(255)         // Required
+  model: STRING(255)                // Required
+  quantity: INTEGER                 // Required, min: 1
+}
+
+Frontend Form Structure:
+
+Request Type:
+- requestType: "b2b" | "b2c" | null  // Required - User selection
+
+B2B Fields (same structure as Sales Modal B2B):
+{
+  customer_name: string                    // Required
+  company_name: string                     // Required
+  gst_number: string                       // Optional
+  contact_person: string                   // Required
+  customer_email: string                   // Optional
+  customer_phone: string                   // Optional
+  billing_address: Address                 // Required
+  delivery_address: Address                // Required if delivery_matches_billing = false
+  delivery_matches_billing: boolean
+}
+
+B2C Fields (same structure as Sales Modal B2C):
+{
+  customer_name: string                    // Required
+  customer_email: string                   // Optional
+  customer_phone: string                   // Required
+  billing_address: Address                 // Required
+  delivery_address: Address                // Required if delivery_matches_billing = false
+  delivery_matches_billing: boolean
+}
+
+Request Items Array:
+[
+  {
+    product_id: string                     // Required
+    quantity: number                       // Required, > 0
+  }
+]
+
+Additional Fields:
+{
+  notes: string                            // Optional
+}
+
+API Request Structure (POST /api/stock-requests):
+{
+  requested_from: "admin"                  // Fixed - agents request from admin
+  items: [                                 // Required
+    {
+      product_id: string                   // Required
+      quantity: number                     // Required, min: 1
+    }
+  ]
+  request_type: "b2b" | "b2c"             // Required - For customer info storage
+  
+  // B2B Specific (if request_type = "b2b"):
+  customer_name: string                    // Required
+  company_name: string                     // Required
+  gst_number?: string                      // Optional
+  contact_person: string                   // Required
+  customer_email?: string                  // Optional
+  customer_phone?: string                  // Optional
+  billing_address: Address                 // Required - Address object
+  delivery_address?: Address               // Optional if delivery_matches_billing = true
+  
+  // B2C Specific (if request_type = "b2c"):
+  customer_name: string                    // Required
+  customer_email?: string                  // Optional
+  customer_phone: string                   // Required
+  billing_address: Address                 // Required - Address object
+  delivery_address?: Address               // Optional if delivery_matches_billing = true
+  
+  notes?: string                           // Optional
+}
+
+API Endpoints:
+- GET /api/stock-requests - Get all stock requests (Auth required)
+  Query Params: status (pending/dispatched/confirmed/rejected), 
+                requested_by_id, requested_from
+  
+- GET /api/stock-requests/:id - Get stock request by ID (Auth required)
+  
+- POST /api/stock-requests - Create stock request (Role: admin, agent)
+  Request Body: See API Request Structure above
+  
+- POST /api/stock-requests/:id/dispatch - Dispatch stock request (Role: super-admin, admin)
+  Content-Type: multipart/form-data (if dispatch_image) or application/json
+  Request Body: { dispatch_image?: File, rejection_reason?: string }
+  
+- POST /api/stock-requests/:id/confirm - Confirm receipt (Must be requester)
+  Content-Type: multipart/form-data (if confirmation_image)
+  Request Body: { confirmation_image?: File }
+  
+- PUT /api/stock-requests/:id - Update stock request (Must be requester, status = pending)
+  Request Body: { items?: StockRequestItem[], notes?: string }
+  
+- DELETE /api/stock-requests/:id - Delete stock request (Requester or super-admin, status = pending)
+
+Validation Rules:
+- requestType: Required (must be "b2b" or "b2c")
+- At least one item required
+- product_id: Required for each item
+- quantity: Required, min: 1 for each item
+- B2B fields validation (same as Sales Modal B2B)
+- B2C fields validation (same as Sales Modal B2C)
+
+Status Flow:
+1. pending - Initial state when created
+2. dispatched - When approved and dispatched (with dispatch_image)
+3. confirmed - When requester confirms receipt (with confirmation_image)
+4. rejected - When rejected (with rejection_reason)
+
+================================================================================
+5. ADMIN STOCK REQUEST MODAL SCHEMA
+================================================================================
+
+Location: components/modals/admin-stock-request-modal.tsx
+Database Tables: stock_requests, stock_request_items
+
+Props:
+{
+  onClose: () => void
+  onSuccess: () => void
+  requestType: "super-admin" | "admin-transfer"
+}
+
+Frontend Form Structure:
+
+For "super-admin" (Request to Super-Admin):
+{
+  items: [
+    {
+      product_id: string                   // Required
+      quantity: number                     // Required, > 0
+    }
+  ]
+  notes: string                            // Optional
+}
+
+For "admin-transfer" (Transfer to Another Admin):
+{
+  items: [
+    {
+      product_id: string                   // Required
+      quantity: number                     // Required, > 0
+    }
+  ]
+  selectedAdminId: string                  // Required - Target admin ID
+  notes: string                            // Optional
+}
+
+API Request Structure (POST /api/stock-requests):
+
+For "super-admin":
+{
+  requested_from: "super-admin"            // Fixed
+  items: [                                 // Required
+    {
+      product_id: string                   // Required
+      quantity: number                     // Required, min: 1
+    }
+  ]
+  notes?: string                           // Optional
+}
+
+For "admin-transfer":
+{
+  requested_from: <admin_id>               // Target admin ID
+  items: [                                 // Required
+    {
+      product_id: string                   // Required
+      quantity: number                     // Required, min: 1
+    }
+  ]
+  notes?: string                           // Optional
+}
+
+API Endpoints: (Same as Agent Stock Request Modal)
+
+Validation Rules:
+- At least one item required
+- product_id: Required for each item
+- quantity: Required, min: 1 for each item
+- selectedAdminId: Required if requestType = "admin-transfer"
+
+================================================================================
+6. ENHANCED REQUEST APPROVAL MODAL SCHEMA
+================================================================================
+
+Location: components/modals/enhanced-request-approval-modal.tsx
+
+Props:
+{
+  request: StockRequest                    // Required - Stock request object
+  onClose: () => void
+  onSuccess: () => void
+}
+
+Form Structure:
+{
+  rejection_reason?: string                // Optional - Required if rejecting
+  dispatch_image?: File                    // Optional - Image of dispatched stock (max 5MB)
+}
+
+API Request Structure (POST /api/stock-requests/:id/dispatch):
+
+To Approve:
+- Content-Type: multipart/form-data (if dispatch_image) or application/json
+- Request Body: { dispatch_image?: File }
+- Updates: status = 'dispatched', dispatched_date = NOW, dispatched_by_id, dispatched_by_name
+
+To Reject:
+- Content-Type: application/json
+- Request Body: { rejection_reason: string }
+- Updates: status = 'rejected', rejection_reason
+
+API Endpoints:
+- POST /api/stock-requests/:id/dispatch - Dispatch or reject request
+  Role: super-admin, admin
+
+Validation Rules:
+- If approving: dispatch_image optional (recommended for verification)
+- If rejecting: rejection_reason required
+
+================================================================================
+7. STOCK CONFIRMATION MODAL SCHEMA
+================================================================================
+
+Location: components/modals/stock-confirmation-modal.tsx
+
+Props:
+{
+  request: StockRequest                    // Required - Stock request object (status = 'dispatched')
+  onClose: () => void
+  onSuccess: () => void
+}
+
+Form Structure:
+{
+  confirmation_image?: File                // Optional - Image of received stock (max 5MB)
+}
+
+API Request Structure (POST /api/stock-requests/:id/confirm):
+- Content-Type: multipart/form-data (if confirmation_image) or application/json
+- Request Body: { confirmation_image?: File }
+- Updates: status = 'confirmed', confirmed_date = NOW, confirmed_by_id, confirmed_by_name
+
+API Endpoints:
+- POST /api/stock-requests/:id/confirm - Confirm receipt
+  Required: Must be the requester (requested_by_id matches current user)
+
+Validation Rules:
+- confirmation_image: Optional (recommended for verification)
+- Request must be in 'dispatched' status
+
+================================================================================
+8. USER/ACCOUNT MANAGEMENT
+================================================================================
+
+Database Model: User
+Database Table: users
+
+Database Structure:
+{
+  id: STRING(50)                    // Primary Key
+  username: STRING(100)             // Required, Unique
+  password: STRING(255)             // Required (hashed)
+  name: STRING(255)                 // Required
+  role: ENUM('super-admin', 'admin', 'agent', 'account') // Required
+  is_active: BOOLEAN                // Default: false
+  created_by_id: STRING(50)         // Optional - FK to users
+  created_by_name: STRING(255)      // Optional
+  created_at: DATE                  // Timestamp
+  updated_at: DATE                  // Timestamp
+}
+
+API Endpoints:
+- POST /api/auth/login - Login
+  Request Body: { username: string, password: string }
+  Response: { message, token, user }
+  
+- GET /api/auth/me - Get current user (Auth required)
+  Headers: Authorization: Bearer <token>
+  
+- GET /api/users - Get all users (Role: super-admin, admin)
+  Query Params: role (optional)
+  Headers: Authorization: Bearer <token>
+  
+- GET /api/users/:id - Get user by ID (Role: super-admin, admin)
+  
+- POST /api/users - Create user (Role: super-admin, admin)
+  Request Body: { username, password, name, role }
+  Rules: Super-admins can create any role (activated immediately)
+         Admins can create agents only (inactive until approved)
+  
+- PUT /api/users/:id - Update user (Role: super-admin)
+  Request Body: { name?, is_active?, ... } (partial updates)
+  
+- DELETE /api/users/:id - Delete user (Role: super-admin)
+
+Account Dashboard (components/dashboards/account-dashboard.tsx):
+- Fetches agents using: GET /api/users?role=agent
+- Approves agent: PUT /api/users/:id { is_active: true }
+- Rejects agent: PUT /api/users/:id { is_active: false }
+
+================================================================================
+9. INVENTORY TRANSACTIONS
+================================================================================
+
+Database Model: InventoryTransaction
+Database Table: inventory_transactions
+
+Database Structure:
+{
+  id: STRING(50)                    // Primary Key
+  product_id: STRING(50)            // Required - FK to products
+  transaction_type: ENUM('purchase', 'sale', 'return', 'adjustment', 'transfer') // Required
+  quantity: INTEGER                 // Required (positive or negative)
+  reference: STRING(255)            // Optional
+  related_stock_request_id: STRING(50)  // Optional - FK to stock_requests
+  related_sale_id: STRING(50)      // Optional - FK to sales
+  notes: TEXT                       // Optional
+  created_by: STRING(50)            // Optional - FK to users
+  timestamp: DATE                   // Default: NOW
+}
+
+API Endpoints:
+- GET /api/inventory-transactions - Get all transactions (Auth required)
+  Query Params: product_id, transaction_type, start_date, end_date
+  
+- GET /api/inventory-transactions/:id - Get transaction by ID (Auth required)
+  
+- POST /api/inventory-transactions - Create transaction (Role: super-admin, admin)
+  Request Body: { product_id, transaction_type, quantity, reference?, 
+                  related_stock_request_id?, related_sale_id?, notes?, created_by? }
+
+================================================================================
+10. ADMIN INVENTORY
+================================================================================
+
+Database Model: AdminInventory
+Database Table: admin_inventory
+
+Database Structure:
+{
+  id: STRING(50)                    // Primary Key
+  admin_id: STRING(50)              // Required - FK to users (admin role)
+  product_id: STRING(50)            // Required - FK to products
+  quantity: INTEGER                 // Required, default: 0
+  created_at: DATE                  // Timestamp
+  updated_at: DATE                  // Timestamp
+  Unique Constraint: (admin_id, product_id)
+}
+
+API Endpoints:
+- GET /api/admin-inventory - Get all admin inventory (Auth required)
+  Query Params: admin_id (optional)
+  
+- GET /api/admin-inventory/admin/:adminId - Get inventory for specific admin (Auth required)
+  
+- POST /api/admin-inventory - Create/Update admin inventory (Role: super-admin)
+  Request Body: { admin_id, product_id, quantity }
+  
+- PUT /api/admin-inventory/:id - Update admin inventory (Role: super-admin)
+  
+- DELETE /api/admin-inventory/:id - Delete admin inventory (Role: super-admin)
+
+================================================================================
+11. STOCK RETURNS
+================================================================================
+
+Database Model: StockReturn
+Database Table: stock_returns
+
+Database Structure:
+{
+  id: STRING(50)                    // Primary Key
+  admin_id: STRING(50)              // Required - FK to users (admin role)
+  product_id: STRING(50)            // Required - FK to products
+  quantity: INTEGER                 // Required
+  return_date: DATE                 // Default: NOW
+  reason: TEXT                      // Optional
+  status: ENUM('pending', 'completed') // Default: 'pending'
+  processed_by: STRING(50)          // Optional - FK to users
+  processed_date: DATE              // Optional
+  notes: TEXT                       // Optional
+}
+
+API Endpoints:
+- GET /api/stock-returns - Get all stock returns (Auth required)
+  Query Params: admin_id, status, start_date, end_date
+  
+- GET /api/stock-returns/:id - Get stock return by ID (Auth required)
+  
+- POST /api/stock-returns - Create stock return (Role: admin)
+  Request Body: { product_id, quantity, reason?, notes? }
+  
+- POST /api/stock-returns/:id/process - Process stock return (Role: super-admin)
+  
+- PUT /api/stock-returns/:id - Update stock return (Admin or super-admin, status = pending)
+  
+- DELETE /api/stock-returns/:id - Delete stock return (Admin or super-admin, status = pending)
+
+================================================================================
+12. CATEGORIES
+================================================================================
+
+API Endpoints:
+- GET /api/categories - Get all categories (Public, no auth)
+  Returns: Distinct category labels from products
+  
+- GET /api/categories/:label - Get category by label (Public)
+  Checks if any product uses the label (404 if not found)
+  
+Note: Categories are no longer managed as separate table. Assign category labels 
+directly when creating/updating products. POST/PUT/DELETE to /api/categories 
+returns error message.
+
+================================================================================
+COMMON PATTERNS AND VALIDATION
+================================================================================
+
+Authentication:
+- Most endpoints require JWT authentication
+- Include token in header: Authorization: Bearer <token>
+- Token obtained from: POST /api/auth/login
+- On 401 errors, token is cleared and user redirected to login
+
+Address Validation:
+- All address fields (except line2) are required
+- Line2 is optional
+- Address objects are created automatically when sent in requests
+- Addresses referenced by ID in database (billing_address_id, delivery_address_id)
+
+File Upload Rules:
+- Maximum file size: 5MB (configurable via MAX_FILE_SIZE in .env)
+- Allowed types: JPEG, JPG, PNG, GIF, PDF
+- Use multipart/form-data content type
+- Files accessible at: http://localhost:3000/uploads/<filename>
+
+Price Fields:
+- Only visible to agents in modals
+- Required for agents when creating products/sales
+- Hidden from super-admin and admin dashboards and product modals
+- Stored as unit_price in database
+
+Role-Based Access:
+- Super-Admin: Full access except price visibility
+- Admin: Can manage stock requests, sales, cannot see prices
+- Agent: Can create sales, stock requests, set prices
+- Account: Can view and approve/reject agents (via users API)
+
+Status Flows:
+
+Stock Requests:
+pending → dispatched → confirmed
+pending → rejected
+
+Sales:
+payment_status: pending → completed
+B2B bills: Can be confirmed by account role (bill_confirmed_date)
+
+Stock Returns:
+status: pending → completed (processed by super-admin)
+
+Error Handling:
+- All modals handle API errors gracefully
+- Error messages displayed to user
+- Loading states during API calls
+- Form validation before API submission
+- Error responses: { error: "Error message here" }
+
+Common Status Codes:
+- 200 - Success
+- 201 - Created
+- 400 - Bad Request
+- 401 - Unauthorized (token invalid/expired)
+- 403 - Forbidden (insufficient permissions)
+- 404 - Not Found
+- 500 - Internal Server Error
+
+================================================================================
+DATA FLOW EXAMPLES
+================================================================================
+
+1. Agent Creates Sale:
+   a. Fill Sales Modal (B2B/B2C fields + items)
+   b. POST /api/sales with address objects
+   c. Backend creates Address records
+   d. Backend creates Sale and SaleItem records
+   e. Backend creates InventoryTransaction (type: 'sale')
+
+2. Agent Creates Stock Request:
+   a. Fill Agent Stock Request Modal (B2B/B2C + items)
+   b. POST /api/stock-requests with customer info
+   c. Backend creates StockRequest and StockRequestItem records
+   d. Status: 'pending'
+
+3. Admin/Super-Admin Approves Request:
+   a. View request in dashboard
+   b. POST /api/stock-requests/:id/dispatch with dispatch_image
+   c. Backend updates status to 'dispatched'
+   d. Backend creates InventoryTransaction (type: 'transfer')
+   e. Backend updates AdminInventory if admin recipient
+
+4. Agent Confirms Receipt:
+   a. View dispatched request
+   b. POST /api/stock-requests/:id/confirm with confirmation_image
+   c. Backend updates status to 'confirmed'
+   d. Backend creates InventoryTransaction (type: 'purchase' for admin)
+
+5. Account Approves Agent:
+   a. View agents in Account Dashboard
+   b. PUT /api/users/:id { is_active: true }
+   c. Backend updates user.is_active = true
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

@@ -7,6 +7,7 @@ import { X, Loader2, AlertCircle } from "lucide-react"
 import { productsApi, type Product } from "@/lib/api"
 import { stockRequestsApi } from "@/lib/api"
 import { authService } from "@/lib/auth"
+import AddressFields, { type Address } from "@/components/forms/address-fields"
 
 interface AgentStockRequestModalProps {
   onClose: () => void
@@ -23,6 +24,16 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
   const [items, setItems] = useState<Array<{ product_id: string; quantity: number }>>([])
   const [notes, setNotes] = useState("")
   
+  // Address structure matching the Address model
+  const emptyAddress: Address = {
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+    postal_code: "",
+    country: "",
+  }
+  
   // B2B fields
   const [b2bFields, setB2bFields] = useState({
     customer_name: "",
@@ -31,8 +42,8 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
     contact_person: "",
     customer_email: "",
     customer_phone: "",
-    billing_address: "",
-    delivery_address: "",
+    billing_address: { ...emptyAddress },
+    delivery_address: { ...emptyAddress },
     delivery_matches_billing: false,
   })
   
@@ -41,8 +52,8 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
     customer_name: "",
     customer_email: "",
     customer_phone: "",
-    billing_address: "",
-    delivery_address: "",
+    billing_address: { ...emptyAddress },
+    delivery_address: { ...emptyAddress },
     delivery_matches_billing: false,
   })
 
@@ -99,6 +110,20 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
         setError("Please fill all required B2B fields")
         return
       }
+      // Validate billing address
+      const billing = b2bFields.billing_address
+      if (!billing.line1 || !billing.city || !billing.state || !billing.postal_code || !billing.country) {
+        setError("Please fill all required billing address fields")
+        return
+      }
+      // Validate delivery address if different
+      if (!b2bFields.delivery_matches_billing) {
+        const delivery = b2bFields.delivery_address
+        if (!delivery.line1 || !delivery.city || !delivery.state || !delivery.postal_code || !delivery.country) {
+          setError("Please fill all required delivery address fields")
+          return
+        }
+      }
     }
     
     // Validate B2C fields
@@ -107,17 +132,59 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
         setError("Please fill all required B2C fields")
         return
       }
+      // Validate billing address
+      const billing = b2cFields.billing_address
+      if (!billing.line1 || !billing.city || !billing.state || !billing.postal_code || !billing.country) {
+        setError("Please fill all required billing address fields")
+        return
+      }
+      // Validate delivery address if different
+      if (!b2cFields.delivery_matches_billing) {
+        const delivery = b2cFields.delivery_address
+        if (!delivery.line1 || !delivery.city || !delivery.state || !delivery.postal_code || !delivery.country) {
+          setError("Please fill all required delivery address fields")
+          return
+        }
+      }
     }
     
     setIsSubmitting(true)
     
     try {
-      // Create stock request
-      await stockRequestsApi.create({
+      // Create stock request with address and customer details
+      const requestData: any = {
         requested_from: "admin", // Agent requests from admin
         items: items,
         notes: notes || `Request type: ${requestType.toUpperCase()}. ${requestType === "b2b" ? `Customer: ${b2bFields.customer_name}, Company: ${b2bFields.company_name}` : `Customer: ${b2cFields.customer_name}`}`,
-      })
+        request_type: requestType,
+      }
+
+      // Add B2B fields
+      if (requestType === "b2b") {
+        requestData.customer_name = b2bFields.customer_name
+        requestData.company_name = b2bFields.company_name
+        requestData.gst_number = b2bFields.gst_number || undefined
+        requestData.contact_person = b2bFields.contact_person
+        requestData.customer_email = b2bFields.customer_email || undefined
+        requestData.customer_phone = b2bFields.customer_phone || undefined
+        requestData.billing_address = b2bFields.billing_address
+        if (!b2bFields.delivery_matches_billing) {
+          requestData.delivery_address = b2bFields.delivery_address
+        }
+      }
+
+      // Add B2C fields
+      if (requestType === "b2c") {
+        requestData.customer_name = b2cFields.customer_name
+        requestData.customer_email = b2cFields.customer_email || undefined
+        requestData.customer_phone = b2cFields.customer_phone
+        requestData.billing_address = b2cFields.billing_address
+        if (!b2cFields.delivery_matches_billing) {
+          requestData.delivery_address = b2cFields.delivery_address
+        }
+      }
+
+      await stockRequestsApi.create(requestData)
       
       onSuccess()
       onClose()
@@ -265,21 +332,25 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Billing Address</label>
-                <textarea
-                  value={b2bFields.billing_address}
-                  onChange={(e) => setB2bFields({ ...b2bFields, billing_address: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
-                />
-              </div>
+              <AddressFields
+                address={b2bFields.billing_address}
+                onChange={(address) => setB2bFields({ ...b2bFields, billing_address: address })}
+                label="Billing Address"
+                required
+              />
               
               <div>
                 <label className="flex items-center gap-2 text-sm text-slate-300">
                   <input
                     type="checkbox"
                     checked={b2bFields.delivery_matches_billing}
-                    onChange={(e) => setB2bFields({ ...b2bFields, delivery_matches_billing: e.target.checked })}
+                    onChange={(e) => {
+                      setB2bFields({ 
+                        ...b2bFields, 
+                        delivery_matches_billing: e.target.checked,
+                        delivery_address: e.target.checked ? { ...b2bFields.billing_address } : { ...emptyAddress }
+                      })
+                    }}
                     className="rounded"
                   />
                   Delivery address same as billing address
@@ -287,14 +358,12 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
               </div>
               
               {!b2bFields.delivery_matches_billing && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Delivery Address</label>
-                  <textarea
-                    value={b2bFields.delivery_address}
-                    onChange={(e) => setB2bFields({ ...b2bFields, delivery_address: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
-                  />
-                </div>
+                <AddressFields
+                  address={b2bFields.delivery_address}
+                  onChange={(address) => setB2bFields({ ...b2bFields, delivery_address: address })}
+                  label="Delivery Address"
+                  required
+                />
               )}
             </div>
           )}
@@ -338,21 +407,25 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Billing Address</label>
-                <textarea
-                  value={b2cFields.billing_address}
-                  onChange={(e) => setB2cFields({ ...b2cFields, billing_address: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
-                />
-              </div>
+              <AddressFields
+                address={b2cFields.billing_address}
+                onChange={(address) => setB2cFields({ ...b2cFields, billing_address: address })}
+                label="Billing Address"
+                required
+              />
               
               <div>
                 <label className="flex items-center gap-2 text-sm text-slate-300">
                   <input
                     type="checkbox"
                     checked={b2cFields.delivery_matches_billing}
-                    onChange={(e) => setB2cFields({ ...b2cFields, delivery_matches_billing: e.target.checked })}
+                    onChange={(e) => {
+                      setB2cFields({ 
+                        ...b2cFields, 
+                        delivery_matches_billing: e.target.checked,
+                        delivery_address: e.target.checked ? { ...b2cFields.billing_address } : { ...emptyAddress }
+                      })
+                    }}
                     className="rounded"
                   />
                   Delivery address same as billing address
@@ -360,14 +433,12 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
               </div>
               
               {!b2cFields.delivery_matches_billing && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Delivery Address</label>
-                  <textarea
-                    value={b2cFields.delivery_address}
-                    onChange={(e) => setB2cFields({ ...b2cFields, delivery_address: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
-                  />
-                </div>
+                <AddressFields
+                  address={b2cFields.delivery_address}
+                  onChange={(address) => setB2cFields({ ...b2cFields, delivery_address: address })}
+                  label="Delivery Address"
+                  required
+                />
               )}
             </div>
           )}

@@ -58,12 +58,24 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       // Check if it's an ApiClientError by checking for status property
       if (err && typeof err.status === 'number') {
         // This is an ApiClientError
+        const apiError = err.data?.error || err.message || ""
+        
         if (err.status === 401) {
-          errorMessage = err.data?.error || "Invalid username or password."
+          // Handle specific error messages
+          if (apiError.toLowerCase().includes("inactive") || apiError.toLowerCase().includes("account is inactive")) {
+            errorMessage = "Your account is inactive and needs approval. Please contact your administrator or account manager to activate your account."
+          } else {
+            errorMessage = apiError || "Invalid username or password."
+          }
         } else if (err.status === 0 || err.message?.includes("Network error") || err.message?.includes("Failed to fetch")) {
           errorMessage = "Unable to connect to server. Please check if the API server is running at " + (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api")
         } else {
-          errorMessage = err.data?.error || err.message || `Server error (${err.status}). Please try again.`
+          // Handle other error statuses
+          if (apiError.toLowerCase().includes("inactive") || apiError.toLowerCase().includes("account is inactive")) {
+            errorMessage = "Your account is inactive and needs approval. Please contact your administrator or account manager to activate your account."
+          } else {
+            errorMessage = apiError || err.message || `Server error (${err.status}). Please try again.`
+          }
         }
       } else if (err instanceof Error) {
         // Standard Error object
@@ -73,11 +85,26 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           errorMessage = err.message || errorMessage
         }
       } else if (err?.data?.error) {
-        errorMessage = err.data.error
+        const apiError = err.data.error
+        if (apiError.toLowerCase().includes("inactive") || apiError.toLowerCase().includes("account is inactive")) {
+          errorMessage = "Your account is inactive and needs approval. Please contact your administrator or account manager to activate your account."
+        } else {
+          errorMessage = apiError
+        }
       } else if (err?.error) {
-        errorMessage = err.error
+        const apiError = err.error
+        if (apiError.toLowerCase().includes("inactive") || apiError.toLowerCase().includes("account is inactive")) {
+          errorMessage = "Your account is inactive and needs approval. Please contact your administrator or account manager to activate your account."
+        } else {
+          errorMessage = apiError
+        }
       } else if (err?.message) {
-        errorMessage = err.message
+        const apiError = err.message
+        if (apiError.toLowerCase().includes("inactive") || apiError.toLowerCase().includes("account is inactive")) {
+          errorMessage = "Your account is inactive and needs approval. Please contact your administrator or account manager to activate your account."
+        } else {
+          errorMessage = apiError
+        }
       }
       
       setError(errorMessage)
@@ -87,7 +114,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo Section */}
         <div className="text-center mb-8">
@@ -95,7 +122,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-3 rounded-xl">
               <Sun className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white">SolarVault</h1>
+            <h1 className="text-3xl font-bold text-white">Chairbord Solar</h1>
           </div>
           <p className="text-slate-400">Solar Inventory Management System</p>
         </div>

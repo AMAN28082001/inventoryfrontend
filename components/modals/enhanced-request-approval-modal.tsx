@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { X, CheckCircle, XCircle, Upload, Image as ImageIcon, Loader2, AlertCircle } from "lucide-react"
 import type { StockRequest } from "@/lib/api"
-import { stockRequestsApi } from "@/lib/api"
+import { stockRequestsApi, productsApi, type Product } from "@/lib/api"
 import { formatImageUrl } from "@/lib/utils"
 
 interface EnhancedRequestApprovalModalProps {
@@ -27,6 +27,36 @@ export default function EnhancedRequestApprovalModal({
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fullRequest, setFullRequest] = useState<StockRequest>(request)
+  const [products, setProducts] = useState<Record<string, Product>>({})
+  const [loading, setLoading] = useState(true)
+
+  // Fetch full request details and products
+  useEffect(() => {
+    const loadFullDetails = async () => {
+      try {
+        setLoading(true)
+        // Fetch the full request with populated product data
+        const fullRequestData = await stockRequestsApi.getById(request.id)
+        setFullRequest(fullRequestData)
+
+        // Fetch all products to populate missing product info
+        const allProducts = await productsApi.getAll()
+        const productsMap: Record<string, Product> = {}
+        allProducts.forEach(p => {
+          productsMap[p.id] = p
+        })
+        setProducts(productsMap)
+      } catch (err) {
+        console.error("Failed to load request details:", err)
+        // Fallback to original request
+        setFullRequest(request)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadFullDetails()
+  }, [request.id])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -112,35 +142,61 @@ export default function EnhancedRequestApprovalModal({
             <div className="bg-slate-700/50 p-6 rounded-lg space-y-4">
               <div>
                 <p className="text-slate-400 text-sm">Requested By</p>
-                <p className="text-white font-semibold text-lg">{request.requested_by_name || "Unknown"}</p>
+                <p className="text-white font-semibold text-lg">{fullRequest.requested_by_name || request.requested_by_name || "Unknown"}</p>
               </div>
 
               <div>
                 <p className="text-slate-400 text-sm mb-2">Items Requested</p>
                 <div className="space-y-2">
-                  {request.items?.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 bg-slate-600/50 rounded">
-                      <div>
-                        <p className="text-white font-medium">
-                          {item.product?.name || "Unknown Product"} - {item.product?.model || ""}
-                        </p>
-                      </div>
-                      <p className="text-cyan-400 font-bold">{item.quantity} units</p>
+                  {loading ? (
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Loading product details...</span>
                     </div>
-                  ))}
+                  ) : (
+                    fullRequest.items?.map((item, index) => {
+                      const product = item.product || products[item.product_id]
+                      const productName = product?.name || "Unknown Product"
+                      const productModel = product?.model || ""
+                      return (
+                        <div key={index} className="flex justify-between items-center p-2 bg-slate-600/50 rounded">
+                          <div>
+                            <p className="text-white font-medium">
+                              {productName} {productModel && `- ${productModel}`}
+                            </p>
+                          </div>
+                          <p className="text-cyan-400 font-bold">{item.quantity} units</p>
+                        </div>
+                      )
+                    }) || []
+                  )}
                 </div>
               </div>
 
-              {request.notes && (
+              {fullRequest.notes && (
                 <div>
                   <p className="text-slate-400 text-sm">Notes</p>
-                  <p className="text-white">{request.notes}</p>
+                  <p className="text-white">{fullRequest.notes}</p>
                 </div>
               )}
 
               <div>
                 <p className="text-slate-400 text-sm">Request Date</p>
-                <p className="text-white">{new Date(request.created_at).toLocaleDateString()}</p>
+                <p className="text-white">
+                  {fullRequest.created_at 
+                    ? new Date(fullRequest.created_at).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })
+                    : request.created_at 
+                      ? new Date(request.created_at).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })
+                      : "N/A"}
+                </p>
               </div>
             </div>
 

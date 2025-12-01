@@ -54,7 +54,7 @@ export default function RequestApprovalModal({ request, onApprove, onReject, onC
               </div>
               <div>
                 <p className="text-slate-400 text-sm">Request Date</p>
-                <p className="text-white">{new Date(request.requestedDate).toLocaleDateString()}</p>
+                <p className="text-white">{(request.requestedDate || request.created_at) ? new Date(request.requestedDate || request.created_at || "").toLocaleDateString() : "N/A"}</p>
               </div>
             </div>
 
