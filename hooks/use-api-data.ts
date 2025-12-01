@@ -1,0 +1,169 @@
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import { productsApi, salesApi, stockRequestsApi } from "@/lib/api"
+import type { Product, Sale, StockRequest } from "@/lib/api"
+import { ApiClientError } from "@/lib/api-client"
+
+interface UseApiDataResult<T> {
+  data: T[]
+  loading: boolean
+  error: string | null
+  refetch: () => Promise<void>
+}
+
+/**
+ * Hook to fetch products from API
+ */
+export function useProducts(initialData: Product[] = []): UseApiDataResult<Product> & {
+  data: Product[]
+} {
+  const [data, setData] = useState<Product[]>(initialData)
+  const [loading, setLoading] = useState(initialData.length === 0)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const products = await productsApi.getAll()
+      // Transform API data to match frontend format
+      const transformedProducts = products.map((p) => ({
+        ...p,
+        quantity: p.quantity ?? p.central_stock ?? 0,
+        price: p.price ?? p.unit_price,
+      }))
+      setData(transformedProducts)
+    } catch (err) {
+      const errorMessage =
+        err instanceof ApiClientError
+          ? err.data?.error || err.message
+          : "Failed to fetch products"
+      setError(errorMessage)
+      console.error("Error fetching products:", err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (initialData.length === 0) {
+      fetchData()
+    }
+  }, [fetchData, initialData.length])
+
+  return {
+    data,
+    loading,
+    error,
+    refetch: fetchData,
+  }
+}
+
+/**
+ * Hook to fetch sales from API
+ */
+export function useSales(initialData: Sale[] = []): UseApiDataResult<Sale> & {
+  data: Sale[]
+} {
+  const [data, setData] = useState<Sale[]>(initialData)
+  const [loading, setLoading] = useState(initialData.length === 0)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const sales = await salesApi.getAll()
+      // Transform API data to match frontend format
+      const transformedSales = sales.map((s) => ({
+        ...s,
+        totalAmount: s.total_amount,
+        saleDate: s.created_at,
+        // For backward compatibility, add productName from first item if items exist
+        productName: s.items?.[0]?.product?.name || "Multiple Products",
+        quantity: s.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+      }))
+      setData(transformedSales)
+    } catch (err) {
+      const errorMessage =
+        err instanceof ApiClientError
+          ? err.data?.error || err.message
+          : "Failed to fetch sales"
+      setError(errorMessage)
+      console.error("Error fetching sales:", err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (initialData.length === 0) {
+      fetchData()
+    }
+  }, [fetchData, initialData.length])
+
+  return {
+    data,
+    loading,
+    error,
+    refetch: fetchData,
+  }
+}
+
+/**
+ * Hook to fetch stock requests from API
+ */
+export function useStockRequests(
+  initialData: StockRequest[] = []
+): UseApiDataResult<StockRequest> & {
+  data: StockRequest[]
+} {
+  const [data, setData] = useState<StockRequest[]>(initialData)
+  const [loading, setLoading] = useState(initialData.length === 0)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const requests = await stockRequestsApi.getAll()
+      // Transform API data to match frontend format
+      const transformedRequests = requests.map((r) => ({
+        ...r,
+        requestedDate: r.created_at,
+        rejectionReason: r.rejection_reason,
+        adminName: r.requested_by_name || "Unknown",
+        // For backward compatibility with single-item requests
+        productName: r.items?.[0]?.product?.name || "Multiple Products",
+        model: r.items?.[0]?.product?.model || "",
+        quantity: r.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+        status: r.status, // Keep original status (pending, dispatched, confirmed, rejected)
+      }))
+      setData(transformedRequests)
+    } catch (err) {
+      const errorMessage =
+        err instanceof ApiClientError
+          ? err.data?.error || err.message
+          : "Failed to fetch stock requests"
+      setError(errorMessage)
+      console.error("Error fetching stock requests:", err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (initialData.length === 0) {
+      fetchData()
+    }
+  }, [fetchData, initialData.length])
+
+  return {
+    data,
+    loading,
+    error,
+    refetch: fetchData,
+  }
+}
+
