@@ -10,6 +10,18 @@ export const authApi = {
   async getCurrentUser(): Promise<User> {
     return apiClient.get<User>("/auth/me")
   },
+
+  async forgotPassword(username: string): Promise<{ message: string; resetToken?: string; expiresIn?: string }> {
+    return apiClient.post<{ message: string; resetToken?: string; expiresIn?: string }>("/auth/forgot-password", { username })
+  },
+
+  async resetPassword(resetToken: string, newPassword: string): Promise<{ message: string }> {
+    return apiClient.post<{ message: string }>("/auth/reset-password", { resetToken, newPassword })
+  },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    return apiClient.post<{ message: string }>("/auth/change-password", { currentPassword, newPassword })
+  },
 }
 
 // Users API
@@ -315,6 +327,22 @@ export interface Sale {
   payment_status: "pending" | "completed"
   billing_address_id?: string
   delivery_address_id?: string
+  billing_address?: {
+    line1: string
+    line2?: string
+    city: string
+    state: string
+    postal_code: string
+    country: string
+  }
+  delivery_address?: {
+    line1: string
+    line2?: string
+    city: string
+    state: string
+    postal_code: string
+    country: string
+  }
   delivery_matches_billing?: boolean
   company_name?: string
   gst_number?: string

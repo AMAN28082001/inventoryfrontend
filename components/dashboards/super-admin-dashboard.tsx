@@ -291,11 +291,11 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-6">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-6 py-2 sm:py-4 md:py-6">
       {/* Header */}
-      <div className="px-2 sm:px-0">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Super Admin Dashboard</h1>
-        <p className="text-slate-400">Welcome {userName}</p>
+      <div className="w-full">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-1">Super Admin Dashboard</h1>
+        <p className="text-xs sm:text-sm text-slate-400">Welcome {userName}</p>
       </div>
 
       {/* Key Metrics */}
@@ -339,32 +339,33 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
 
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-slate-800 border border-slate-700 p-1 w-full sm:w-auto">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Package className="w-4 h-4 mr-2" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="approvals" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white">
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Approvals
-          </TabsTrigger>
-          <TabsTrigger value="returns" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white">
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Return Approvals
-          </TabsTrigger>
-          <TabsTrigger value="users" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Users
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-4">
+        <div className="w-full mb-6 sm:mb-8 bg-slate-900 rounded-lg p-1">
+          <TabsList className="bg-slate-900 border-0 p-0 w-full grid grid-cols-2 md:grid-cols-4 gap-2">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-slate-300 bg-slate-800 hover:bg-slate-700 text-[11px] sm:text-xs px-3 py-2 rounded-md transition-all flex items-center justify-center">
+              <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="approvals" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white text-slate-300 bg-slate-800 hover:bg-slate-700 text-[11px] sm:text-xs px-3 py-2 rounded-md transition-all flex items-center justify-center">
+              <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+              <span>Approvals</span>
+            </TabsTrigger>
+            <TabsTrigger value="returns" className="data-[state=active]:bg-orange-600 data-[state=active]:text-white text-slate-300 bg-slate-800 hover:bg-slate-700 text-[11px] sm:text-xs px-3 py-2 rounded-md transition-all flex items-center justify-center">
+              <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+              <span>Return Approvals</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white text-slate-300 bg-slate-800 hover:bg-slate-700 text-[11px] sm:text-xs px-3 py-2 rounded-md transition-all flex items-center justify-center">
+              <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+              <span>Users</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value="overview" className="mt-0">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products Management */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Package className="w-5 h-5 text-blue-500" />
+        <div className="lg:col-span-2 space-y-4 mt-4 sm:mt-0">
+          <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white flex items-center gap-2">
+              <Package className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
               Products Catalog
             </h2>
             <div className="flex gap-2 flex-wrap">
@@ -373,9 +374,9 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                 setEditingProduct(null)
                 setShowProductModal(true)
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               Add Product
             </Button>
             </div>
@@ -572,28 +573,28 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
         </TabsContent>
 
         <TabsContent value="approvals" className="mt-4 space-y-6">
-      {/* Stock Requests List */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-amber-500" />
-            Stock Requests
-          </h2>
-        </div>
+          {/* Stock Requests List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-amber-500" />
+                Stock Requests
+              </h2>
+            </div>
 
-        {/* Search by User */}
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by admin name..."
-            value={requestsSearchQuery}
-            onChange={(e) => setRequestsSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-          />
-        </div>
+            {/* Search by User */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by admin name..."
+                value={requestsSearchQuery}
+                onChange={(e) => setRequestsSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
 
-        <div className="space-y-3">
+            <div className="space-y-3">
           {filteredAdminRequests.map((request) => (
             <Card
               key={request.id}
@@ -645,318 +646,318 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                 <p className="text-xs text-red-300 mt-1">Reason: {request.rejection_reason}</p>
               )}
             </Card>
-          ))}
-          {filteredAdminRequests.length === 0 && (
-            <Card className="bg-slate-800 border-slate-700 p-4 text-center">
-              <p className="text-slate-400">No stock requests found</p>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {/* Pending Agent Approvals Section */}
-      {filteredPendingAgents.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Users className="w-5 h-5 text-purple-500" />
-              Pending Agent Approvals
-            </h2>
-          </div>
-
-          {/* Search for Agents */}
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search agents by name or username..."
-              value={agentsSearchQuery}
-              onChange={(e) => setAgentsSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="block lg:hidden space-y-3">
-            {filteredPendingAgents.map((agent) => (
-              <Card key={agent.id} className="bg-slate-800 border-slate-700 p-4">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold text-sm">{agent.name}</p>
-                      <p className="text-xs text-slate-400 mt-1">@{agent.username}</p>
-                    </div>
-                    <span className="px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full whitespace-nowrap">
-                      Pending
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-slate-400 text-xs">Created Date</p>
-                    <p className="text-slate-300 text-sm">
-                      {agent.created_at ? new Date(agent.created_at).toLocaleDateString() : "N/A"}
-                    </p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-700 flex flex-col gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleApproveAgent(agent.id)}
-                      disabled={processingAgentIds.has(agent.id)}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
-                    >
-                      {processingAgentIds.has(agent.id) ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Approve
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleRejectAgent(agent.id)}
-                      disabled={processingAgentIds.has(agent.id)}
-                      variant="outline"
-                      className="w-full border-red-600 text-red-400 hover:bg-red-950 text-xs"
-                    >
-                      {processingAgentIds.has(agent.id) ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <XCircle className="w-4 h-4 mr-1" />
-                          Reject
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </Card>
             ))}
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden lg:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-700/50 border-b border-slate-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Name</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Username</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Created Date</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Status</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700">
-                  {filteredPendingAgents.map((agent) => (
-                    <tr key={agent.id} className="hover:bg-slate-700/30 transition">
-                      <td className="px-6 py-4 text-white font-medium">{agent.name}</td>
-                      <td className="px-6 py-4 text-slate-300">{agent.username}</td>
-                      <td className="px-6 py-4 text-slate-400">
-                        {agent.created_at ? new Date(agent.created_at).toLocaleDateString() : "N/A"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
-                          Pending Approval
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleApproveAgent(agent.id)}
-                            disabled={processingAgentIds.has(agent.id)}
-                            className="bg-green-600 hover:bg-green-700 text-white text-xs"
-                          >
-                            {processingAgentIds.has(agent.id) ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                Approve
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleRejectAgent(agent.id)}
-                            disabled={processingAgentIds.has(agent.id)}
-                            variant="outline"
-                            className="border-red-600 text-red-400 hover:bg-red-950 text-xs"
-                          >
-                            {processingAgentIds.has(agent.id) ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <XCircle className="w-4 h-4 mr-1" />
-                                Reject
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {filteredAdminRequests.length === 0 && (
+              <Card className="bg-slate-800 border-slate-700 p-4 text-center">
+                <p className="text-slate-400">No stock requests found</p>
+              </Card>
+            )}
             </div>
           </div>
-        </div>
-      ) : (
-        <Card className="bg-slate-800 border-slate-700 p-6 text-center">
-          <Users className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-          <p className="text-slate-400 text-lg font-semibold mb-2">No Pending Agent Approvals</p>
-          <p className="text-slate-500 text-sm">All agents have been approved or there are no pending agent creation requests.</p>
-        </Card>
-      )}
+
+          {/* Pending Agent Approvals Section */}
+          {filteredPendingAgents.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-purple-500" />
+                  Pending Agent Approvals
+                </h2>
+              </div>
+
+              {/* Search for Agents */}
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search agents by name or username..."
+                  value={agentsSearchQuery}
+                  onChange={(e) => setAgentsSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="block lg:hidden space-y-3">
+                {filteredPendingAgents.map((agent) => (
+                  <Card key={agent.id} className="bg-slate-800 border-slate-700 p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-semibold text-sm">{agent.name}</p>
+                          <p className="text-xs text-slate-400 mt-1">@{agent.username}</p>
+                        </div>
+                        <span className="px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full whitespace-nowrap">
+                          Pending
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-xs">Created Date</p>
+                        <p className="text-slate-300 text-sm">
+                          {agent.created_at ? new Date(agent.created_at).toLocaleDateString() : "N/A"}
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-slate-700 flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveAgent(agent.id)}
+                          disabled={processingAgentIds.has(agent.id)}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                        >
+                          {processingAgentIds.has(agent.id) ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Approve
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleRejectAgent(agent.id)}
+                          disabled={processingAgentIds.has(agent.id)}
+                          variant="outline"
+                          className="w-full border-red-600 text-red-400 hover:bg-red-950 text-xs"
+                        >
+                          {processingAgentIds.has(agent.id) ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Reject
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-700/50 border-b border-slate-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Name</th>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Username</th>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Created Date</th>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Status</th>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700">
+                      {filteredPendingAgents.map((agent) => (
+                        <tr key={agent.id} className="hover:bg-slate-700/30 transition">
+                          <td className="px-6 py-4 text-white font-medium">{agent.name}</td>
+                          <td className="px-6 py-4 text-slate-300">{agent.username}</td>
+                          <td className="px-6 py-4 text-slate-400">
+                            {agent.created_at ? new Date(agent.created_at).toLocaleDateString() : "N/A"}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
+                              Pending Approval
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleApproveAgent(agent.id)}
+                                disabled={processingAgentIds.has(agent.id)}
+                                className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                              >
+                                {processingAgentIds.has(agent.id) ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    Approve
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleRejectAgent(agent.id)}
+                                disabled={processingAgentIds.has(agent.id)}
+                                variant="outline"
+                                className="border-red-600 text-red-400 hover:bg-red-950 text-xs"
+                              >
+                                {processingAgentIds.has(agent.id) ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <XCircle className="w-4 h-4 mr-1" />
+                                    Reject
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Card className="bg-slate-800 border-slate-700 p-6 text-center">
+              <Users className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+              <p className="text-slate-400 text-lg font-semibold mb-2">No Pending Agent Approvals</p>
+              <p className="text-slate-500 text-sm">All agents have been approved or there are no pending agent creation requests.</p>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="returns" className="mt-4">
-      {/* Stock Returns Section */}
-      {sortedStockReturns.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <RotateCcw className="w-5 h-5 text-orange-500" />
-              Stock Return Approvals
-            </h2>
-          </div>
+          {/* Stock Returns Section */}
+          {sortedStockReturns.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <RotateCcw className="w-5 h-5 text-orange-500" />
+                  Stock Return Approvals
+                </h2>
+              </div>
 
-          {/* Search for Stock Returns */}
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by product name, returned by, or reason..."
-              value={returnsSearchQuery}
-              onChange={(e) => setReturnsSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-            />
-          </div>
+              {/* Search for Stock Returns */}
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by product name, returned by, or reason..."
+                  value={returnsSearchQuery}
+                  onChange={(e) => setReturnsSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
 
-          {/* Mobile Card View */}
-          <div className="block lg:hidden space-y-3">
-            {sortedStockReturns.map((ret) => {
-              const product = returnsProducts[ret.product_id] || ret.product
-              const productName = product?.name || "Unknown Product"
-              const productModel = product?.model || ""
-              const adminName = ret.admin?.name || "Unknown Admin"
-              return (
-                <Card key={ret.id} className="bg-slate-800 border-slate-700 p-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-semibold text-sm">{productName} {productModel && `- ${productModel}`}</p>
-                        <p className="text-xs text-slate-400 mt-1">From: {adminName}</p>
-                      </div>
-                      <span className="px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full whitespace-nowrap">
-                        Pending
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-slate-400 text-xs">Quantity</p>
-                        <p className="text-white font-bold text-cyan-400">{ret.quantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-xs">Date</p>
-                        <p className="text-slate-300 text-sm">
-                          {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                    {ret.reason && (
-                      <div>
-                        <p className="text-slate-400 text-xs">Reason</p>
-                        <p className="text-slate-300 text-sm">{ret.reason}</p>
-                      </div>
-                    )}
-                    <div className="pt-2 border-t border-slate-700">
-                      <Button
-                        size="sm"
-                        onClick={() => handleProcessReturn(ret.id)}
-                        disabled={processingReturnIds.has(ret.id)}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
-                      >
-                        {processingReturnIds.has(ret.id) ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        Approve Return
-                          </>
+              {/* Mobile Card View */}
+              <div className="block lg:hidden space-y-3">
+                {sortedStockReturns.map((ret) => {
+                  const product = returnsProducts[ret.product_id] || ret.product
+                  const productName = product?.name || "Unknown Product"
+                  const productModel = product?.model || ""
+                  const adminName = ret.admin?.name || "Unknown Admin"
+                  return (
+                    <Card key={ret.id} className="bg-slate-800 border-slate-700 p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-semibold text-sm">{productName} {productModel && `- ${productModel}`}</p>
+                            <p className="text-xs text-slate-400 mt-1">From: {adminName}</p>
+                          </div>
+                          <span className="px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full whitespace-nowrap">
+                            Pending
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <p className="text-slate-400 text-xs">Quantity</p>
+                            <p className="text-white font-bold text-cyan-400">{ret.quantity}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-400 text-xs">Date</p>
+                            <p className="text-slate-300 text-sm">
+                              {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                        {ret.reason && (
+                          <div>
+                            <p className="text-slate-400 text-xs">Reason</p>
+                            <p className="text-slate-300 text-sm">{ret.reason}</p>
+                          </div>
                         )}
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              )
-            })}
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden lg:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-700/50 border-b border-slate-700">
-                  <tr>
-                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Product</th>
-                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Quantity</th>
-                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Returned By</th>
-                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Reason</th>
-                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Date</th>
-                    <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700">
-                  {sortedStockReturns.map((ret) => {
-                    const product = returnsProducts[ret.product_id] || ret.product
-                    const productName = product?.name || "Unknown Product"
-                    const productModel = product?.model || ""
-                    const adminName = ret.admin?.name || "Unknown Admin"
-                    return (
-                      <tr key={ret.id} className="hover:bg-slate-700/30 transition">
-                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-medium text-sm">
-                          {productName} {productModel && `- ${productModel}`}
-                        </td>
-                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-bold text-cyan-400 text-sm">{ret.quantity}</td>
-                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-300 text-sm">{adminName}</td>
-                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm max-w-xs truncate">{ret.reason || "N/A"}</td>
-                        <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
-                          {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
-                        </td>
-                        <td className="px-4 xl:px-6 py-3 xl:py-4">
+                        <div className="pt-2 border-t border-slate-700">
                           <Button
                             size="sm"
                             onClick={() => handleProcessReturn(ret.id)}
                             disabled={processingReturnIds.has(ret.id)}
-                            className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                            className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
                           >
                             {processingReturnIds.has(ret.id) ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <>
                                 <CheckCircle className="w-4 h-4 mr-1" />
-                                Approve
+                                Approve Return
                               </>
                             )}
                           </Button>
-                        </td>
+                        </div>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-700/50 border-b border-slate-700">
+                      <tr>
+                        <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Product</th>
+                        <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Quantity</th>
+                        <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Returned By</th>
+                        <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Reason</th>
+                        <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Date</th>
+                        <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Actions</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700">
+                      {sortedStockReturns.map((ret) => {
+                        const product = returnsProducts[ret.product_id] || ret.product
+                        const productName = product?.name || "Unknown Product"
+                        const productModel = product?.model || ""
+                        const adminName = ret.admin?.name || "Unknown Admin"
+                        return (
+                          <tr key={ret.id} className="hover:bg-slate-700/30 transition">
+                            <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-medium text-sm">
+                              {productName} {productModel && `- ${productModel}`}
+                            </td>
+                            <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-bold text-cyan-400 text-sm">{ret.quantity}</td>
+                            <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-300 text-sm">{adminName}</td>
+                            <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm max-w-xs truncate">{ret.reason || "N/A"}</td>
+                            <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
+                              {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                            </td>
+                            <td className="px-4 xl:px-6 py-3 xl:py-4">
+                              <Button
+                                size="sm"
+                                onClick={() => handleProcessReturn(ret.id)}
+                                disabled={processingReturnIds.has(ret.id)}
+                                className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                              >
+                                {processingReturnIds.has(ret.id) ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    Approve
+                                  </>
+                                )}
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      ) : (
-        <Card className="bg-slate-800 border-slate-700 p-6 text-center">
-          <RotateCcw className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-          <p className="text-slate-400 text-lg font-semibold mb-2">No Pending Return Approvals</p>
-          <p className="text-slate-500 text-sm">There are no pending stock returns awaiting approval at the moment.</p>
-        </Card>
-      )}
+          ) : (
+            <Card className="bg-slate-800 border-slate-700 p-6 text-center">
+              <RotateCcw className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+              <p className="text-slate-400 text-lg font-semibold mb-2">No Pending Return Approvals</p>
+              <p className="text-slate-500 text-sm">There are no pending stock returns awaiting approval at the moment.</p>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="users" className="mt-4">

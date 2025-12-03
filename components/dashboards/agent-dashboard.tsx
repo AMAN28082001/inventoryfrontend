@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Users, ShoppingCart, CreditCard, TrendingUp, BarChart3, Target, Loader2, RotateCcw, Search } from "lucide-react"
+import { Plus, Users, ShoppingCart, CreditCard, TrendingUp, BarChart3, Target, Loader2, RotateCcw, Search, Download } from "lucide-react"
 import SalesModal from "@/components/modals/sales-modal"
 import AgentStockRequestModal from "@/components/modals/agent-stock-request-modal"
 import StockConfirmationModal from "@/components/modals/stock-confirmation-modal"
@@ -11,7 +11,9 @@ import StockReturnModal from "@/components/modals/stock-return-modal"
 import { useSalesState } from "@/hooks/use-sales-state"
 import { useStockRequestsState } from "@/hooks/use-stock-requests-state"
 import { authService } from "@/lib/auth"
-import type { Sale } from "@/lib/api"
+import { salesApi, productsApi } from "@/lib/api"
+import { generateQuotationPDF } from "@/lib/quotation-generator"
+import type { Sale, Product } from "@/lib/api"
 import type { StockRequest } from "@/lib/api"
 
 interface AgentDashboardProps {
@@ -30,8 +32,44 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
   const [selectedRequest, setSelectedRequest] = useState<StockRequest | null>(null)
   const [salesSearchQuery, setSalesSearchQuery] = useState("")
   const [requestsSearchQuery, setRequestsSearchQuery] = useState("")
+  const [downloadingSaleId, setDownloadingSaleId] = useState<string | null>(null)
 
   const currentUserId = authService.getUser()?.id
+
+  const handleDownloadQuotation = async (sale: Sale) => {
+    try {
+      setDownloadingSaleId(sale.id)
+      // Fetch full sale details with addresses
+      const fullSale = await salesApi.getById(sale.id)
+      console.log("Fetched sale data:", fullSale)
+      
+      // Fetch all products for lookup
+      const allProducts = await productsApi.getAll()
+      const productsMap: Record<string, Product> = {}
+      allProducts.forEach(p => {
+        productsMap[p.id] = p
+      })
+      
+      // Validate required data
+      if (!fullSale.items || fullSale.items.length === 0) {
+        throw new Error("Sale has no items")
+      }
+      
+      // Generate and download PDF
+      try {
+        generateQuotationPDF(fullSale as any, productsMap)
+      } catch (pdfError: any) {
+        console.error("PDF generation error:", pdfError)
+        throw new Error(`PDF generation failed: ${pdfError.message}`)
+      }
+    } catch (err: any) {
+      console.error("Failed to generate quotation:", err)
+      const errorMessage = err.message || err.data?.error || "Failed to generate quotation. Please try again."
+      alert(errorMessage)
+    } finally {
+      setDownloadingSaleId(null)
+    }
+  }
 
   // Filter my stock requests
   const myRequests = requests.requests.filter(r => r.requested_by_id === currentUserId)
@@ -297,6 +335,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                   <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Amount</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Payment</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Date</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700">
@@ -332,11 +371,29 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                       <td className="px-6 py-4 text-slate-400">
                         {(sale.saleDate || sale.created_at) ? new Date(sale.saleDate || sale.created_at || "").toLocaleDateString() : "N/A"}
                       </td>
+                      <td className="px-6 py-4">
+                        <Button
+                          size="sm"
+                          onClick={() => handleDownloadQuotation(sale)}
+                          disabled={downloadingSaleId === sale.id}
+                          variant="outline"
+                          className="border-blue-600 text-blue-400 hover:bg-blue-950 text-xs"
+                        >
+                          {downloadingSaleId === sale.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-1" />
+                              Quote
+                            </>
+                          )}
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                    <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
                       No sales found
                     </td>
                   </tr>

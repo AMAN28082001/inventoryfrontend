@@ -467,40 +467,40 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
             
             <div className="space-y-3">
               {items.map((item, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                <div key={index} className="flex flex-col gap-3 p-3 bg-slate-700/30 rounded-lg">
                   <select
                     value={item.product_id}
                     onChange={(e) => updateItem(index, "product_id", e.target.value)}
-                    className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-              required
-            >
+                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    required
+                  >
                     <option value="">Select Product</option>
-              {products.map((product) => (
+                    {products.map((product) => (
                       <option key={product.id} value={product.id}>
-                  {product.name} - {product.model}
-                </option>
-              ))}
-            </select>
-                  <div className="flex gap-2">
-              <input
-                type="number"
+                        {product.name} - {product.model}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <input
+                      type="number"
                       value={item.quantity || ""}
                       onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
                       placeholder="Qty"
-                min="1"
-                      className="w-20 sm:w-24 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
-                required
-              />
-              <input
-                type="number"
+                      min="1"
+                      className="w-full px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                    <input
+                      type="number"
                       value={item.unit_price || ""}
                       onChange={(e) => updateItem(index, "unit_price", parseFloat(e.target.value) || 0)}
-                      placeholder="Price"
+                      placeholder="Price (₹)"
                       step="0.01"
                       min="0"
-                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
-                required
-              />
+                      className="w-full px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
                     <input
                       type="number"
                       value={item.gst_rate || ""}
@@ -509,14 +509,14 @@ export default function SalesModal({ saleType, onClose, onSave }: SalesModalProp
                       step="0.1"
                       min="0"
                       max="100"
-                      className="w-20 sm:w-24 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      className="w-full px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
                     />
                     <Button
                       type="button"
                       onClick={() => removeItem(index)}
                       variant="outline"
                       size="sm"
-                      className="border-red-600 text-red-400 hover:bg-red-950 flex-shrink-0"
+                      className="w-full border-red-600 text-red-400 hover:bg-red-950"
                     >
                       <X className="w-4 h-4" />
                     </Button>

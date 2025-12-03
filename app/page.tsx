@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Sun, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import LoginPage from "@/components/auth/login-page"
 import SuperAdminDashboard from "@/components/dashboards/super-admin-dashboard"
 import AdminDashboard from "@/components/dashboards/admin-dashboard"
@@ -76,28 +76,29 @@ export default function Home() {
     <div className="min-h-screen bg-black">
       {/* Header */}
       <header className="border-b border-slate-700 bg-slate-950/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="flex items-center justify-between h-14 sm:h-16 px-3 sm:px-4 md:px-6 max-w-7xl mx-auto">
+        <div className="flex items-center justify-between min-h-[56px] sm:min-h-[64px] px-2 sm:px-4 md:px-6 max-w-7xl mx-auto py-1.5 sm:py-2">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-            <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-1.5 sm:p-2 rounded-lg flex-shrink-0">
-              <Sun className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-base sm:text-lg md:text-xl font-bold text-white truncate">Chairbord Solar</h1>
-              <p className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">Inventory Management</p>
+            {/* Logo */}
+            <div className="relative flex-shrink-0">
+              <img 
+                src="https://res.cloudinary.com/du0cxgoic/image/upload/v1753789133/logo_Chairbord_Solar_1_1_avkjps.png" 
+                alt="Chairbord Solar Logo" 
+                className="h-8 w-auto sm:h-10 md:h-12 object-contain"
+              />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-            {/* User info */}
-            <div className="text-right">
-              <p className="text-xs sm:text-sm font-medium text-white truncate max-w-[80px] sm:max-w-[120px] md:max-w-none">{loggedInUser.name}</p>
-              <p className="text-[10px] sm:text-xs text-slate-400 capitalize hidden sm:block">{loggedInUser.role.replace("-", " ")}</p>
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-4 flex-shrink-0">
+            {/* User info - Hidden on very small screens to save space */}
+            <div className="text-right hidden sm:block min-w-0">
+              <p className="text-[10px] sm:text-xs md:text-sm font-medium text-white truncate max-w-[50px] sm:max-w-[100px] md:max-w-[140px] lg:max-w-none">{loggedInUser.name}</p>
+              <p className="text-[9px] sm:text-[10px] md:text-xs text-slate-400 capitalize hidden md:block">{loggedInUser.role.replace("-", " ")}</p>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={handleLogout}
-              className="border-slate-600 text-slate-300 hover:bg-slate-800 bg-transparent text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 md:px-4 whitespace-nowrap"
+              className="border-slate-600 text-slate-300 hover:bg-slate-800 bg-transparent text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 md:h-9 px-2 sm:px-3 md:px-4 whitespace-nowrap flex-shrink-0"
             >
               <span className="hidden sm:inline">Logout</span>
               <span className="sm:hidden">Out</span>
@@ -107,7 +108,7 @@ export default function Home() {
       </header>
 
       {/* Dashboard Content */}
-      <main className="p-2 sm:p-4 md:p-6">
+      <main className="w-full overflow-x-hidden">
         {loggedInUser.role === "super-admin" && <SuperAdminDashboard userName={loggedInUser.name} />}
         {loggedInUser.role === "admin" && <AdminDashboard userName={loggedInUser.name} />}
         {loggedInUser.role === "account" && <AccountDashboard userName={loggedInUser.name} />}

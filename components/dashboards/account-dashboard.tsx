@@ -3,9 +3,12 @@
 import { useState, useEffect, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, XCircle, Loader2, AlertCircle, UserCheck, UserX, Search, Filter } from "lucide-react"
-import { usersApi } from "@/lib/api"
+import { CheckCircle, XCircle, Loader2, AlertCircle, UserCheck, UserX, Search, Filter, Download, ShoppingCart } from "lucide-react"
+import { usersApi, salesApi, productsApi } from "@/lib/api"
+import { generateQuotationPDF } from "@/lib/quotation-generator"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import type { User } from "@/lib/auth"
+import type { Sale, Product } from "@/lib/api"
 
 interface AccountDashboardProps {
   userName: string
@@ -18,6 +21,16 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all")
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  
+  // Sales state
+  const [sales, setSales] = useState<Sale[]>([])
+  const [loadingSales, setLoadingSales] = useState(true)
+  const [salesSearchQuery, setSalesSearchQuery] = useState("")
+  const [salesTypeFilter, setSalesTypeFilter] = useState<"all" | "B2B" | "B2C">("all")
+  const [downloadingSaleId, setDownloadingSaleId] = useState<string | null>(null)
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<string>("agents")
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -67,6 +80,58 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])
+
+  // Fetch all agent sales
+  useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        setLoadingSales(true)
+        const allSales = await salesApi.getAll()
+        setSales(allSales)
+      } catch (err: any) {
+        console.error("Failed to fetch sales:", err)
+        setSales([])
+      } finally {
+        setLoadingSales(false)
+      }
+    }
+    fetchSales()
+  }, [])
+
+  const handleDownloadQuotation = async (sale: Sale) => {
+    try {
+      setDownloadingSaleId(sale.id)
+      // Fetch full sale details with addresses
+      const fullSale = await salesApi.getById(sale.id)
+      console.log("Fetched sale data:", fullSale)
+      
+      // Fetch all products for lookup
+      const allProducts = await productsApi.getAll()
+      const productsMap: Record<string, Product> = {}
+      allProducts.forEach(p => {
+        productsMap[p.id] = p
+      })
+      
+      // Validate required data
+      if (!fullSale.items || fullSale.items.length === 0) {
+        throw new Error("Sale has no items")
+      }
+      
+      // Generate and download PDF
+      try {
+        generateQuotationPDF(fullSale as any, productsMap)
+      } catch (pdfError: any) {
+        console.error("PDF generation error:", pdfError)
+        throw new Error(`PDF generation failed: ${pdfError.message}`)
+      }
+    } catch (err: any) {
+      console.error("Failed to generate quotation:", err)
+      const errorMessage = err.message || err.data?.error || "Failed to generate quotation. Please try again."
+      alert(errorMessage)
+    } finally {
+      setDownloadingSaleId(null)
+    }
+  }
 
   const handleApprove = async (agentId: string) => {
     try {
@@ -135,6 +200,21 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
   const inactiveCount = agents.filter((a) => a.is_active === false).length
   const pendingCount = agents.filter((a) => a.is_active === undefined || a.is_active === null).length
 
+  // Filter and sort sales
+  const filteredSales = sales.filter((sale) => {
+    const matchesType = salesTypeFilter === "all" || sale.type === salesTypeFilter
+    const matchesSearch = !salesSearchQuery.trim() || 
+      (sale.customer_name?.toLowerCase().includes(salesSearchQuery.toLowerCase()) || 
+       sale.company_name?.toLowerCase().includes(salesSearchQuery.toLowerCase()) || false)
+    return matchesType && matchesSearch
+  })
+
+  const sortedSales = [...filteredSales].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return dateB - dateA // Descending order (newest first)
+  })
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -153,7 +233,7 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
           Welcome, {userName}
         </h1>
-        <p className="text-slate-400">Manage and approve agent accounts</p>
+        <p className="text-slate-400">Manage and approve agent accounts and sales</p>
       </div>
 
       {error && (
@@ -214,6 +294,20 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
         </Card>
       </div>
 
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-slate-800 border border-slate-700 p-1 w-full sm:w-auto">
+          <TabsTrigger value="agents" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <UserCheck className="w-4 h-4 mr-2" />
+            Agents
+          </TabsTrigger>
+          <TabsTrigger value="sales" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Sales
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="agents" className="mt-4">
       {/* Filters */}
       <Card className="bg-slate-800 border-slate-700 p-4">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -405,6 +499,139 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
           )}
         </div>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="sales" className="mt-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h2 className="text-xl font-bold text-white">All Agent Sales</h2>
+            </div>
+
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by customer or company name..."
+                  value={salesSearchQuery}
+                  onChange={(e) => setSalesSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={salesTypeFilter === "all" ? "default" : "outline"}
+                  onClick={() => setSalesTypeFilter("all")}
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  All
+                </Button>
+                <Button
+                  variant={salesTypeFilter === "B2B" ? "default" : "outline"}
+                  onClick={() => setSalesTypeFilter("B2B")}
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  B2B
+                </Button>
+                <Button
+                  variant={salesTypeFilter === "B2C" ? "default" : "outline"}
+                  onClick={() => setSalesTypeFilter("B2C")}
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  B2C
+                </Button>
+              </div>
+            </div>
+
+            {/* Sales Table */}
+            {loadingSales ? (
+              <Card className="bg-slate-800 border-slate-700 p-8 text-center">
+                <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-4" />
+                <p className="text-slate-400">Loading sales...</p>
+              </Card>
+            ) : (
+              <Card className="bg-slate-800 border-slate-700 p-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-700">
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">Customer</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">Type</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">Agent</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">Amount</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-300">Date</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-300">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedSales.length > 0 ? (
+                        sortedSales.map((sale) => (
+                          <tr key={sale.id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                            <td className="py-4 px-4">
+                              <p className="text-white font-medium">{sale.company_name || sale.customer_name}</p>
+                            </td>
+                            <td className="py-4 px-4">
+                              <span
+                                className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                  sale.type === "B2B"
+                                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/50"
+                                    : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
+                                }`}
+                              >
+                                {sale.type}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <p className="text-slate-300 text-sm">{sale.created_by_name || "N/A"}</p>
+                            </td>
+                            <td className="py-4 px-4">
+                              <p className="text-white font-bold text-emerald-400">
+                                ₹{(sale.total_amount || sale.totalAmount || 0).toLocaleString()}
+                              </p>
+                            </td>
+                            <td className="py-4 px-4">
+                              <p className="text-slate-400 text-sm">
+                                {sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A"}
+                              </p>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="flex items-center justify-end">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleDownloadQuotation(sale)}
+                                  disabled={downloadingSaleId === sale.id}
+                                  variant="outline"
+                                  className="border-blue-600 text-blue-400 hover:bg-blue-950"
+                                >
+                                  {downloadingSaleId === sale.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Download className="w-4 h-4 mr-1" />
+                                      Download
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-slate-400">
+                            No sales found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

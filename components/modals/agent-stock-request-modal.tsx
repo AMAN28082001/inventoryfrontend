@@ -460,11 +460,11 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
             
             <div className="space-y-3">
               {items.map((item, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                <div key={index} className="flex flex-col gap-3 p-3 bg-slate-700/30 rounded-lg">
                   <select
                     value={item.product_id}
                     onChange={(e) => updateItem(index, "product_id", e.target.value)}
-                    className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
                     required
                   >
                     <option value="">Select Product</option>
@@ -479,9 +479,9 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
                       type="number"
                       value={item.quantity || ""}
                       onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
-                      placeholder="Qty"
+                      placeholder="Quantity"
                       min="1"
-                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      className="flex-1 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
                       required
                     />
                     <Button
