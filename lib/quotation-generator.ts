@@ -202,7 +202,7 @@ export function generateQuotationPDF(sale: SaleWithAddresses, products: Record<s
     doc.setFont('helvetica', 'bold')
     doc.text('Dated:', pageWidth - 60, yPos)
     doc.setFont('helvetica', 'normal')
-    const saleDate = sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB')
+    const saleDate = sale.created_at ? new Date(sale.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
     doc.text(saleDate, pageWidth - 40, yPos)
     yPos += 10
 

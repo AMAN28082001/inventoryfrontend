@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { X, CheckCircle, XCircle, Upload, Image as ImageIcon, Loader2, AlertCircle } from "lucide-react"
 import type { StockRequest } from "@/lib/api"
 import { stockRequestsApi, productsApi, type Product } from "@/lib/api"
-import { formatImageUrl } from "@/lib/utils"
+import { formatImageUrl, formatDateISO } from "@/lib/utils"
 
 interface EnhancedRequestApprovalModalProps {
   request: StockRequest
@@ -183,19 +183,7 @@ export default function EnhancedRequestApprovalModal({
               <div>
                 <p className="text-slate-400 text-sm">Request Date</p>
                 <p className="text-white">
-                  {fullRequest.created_at 
-                    ? new Date(fullRequest.created_at).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })
-                    : request.created_at 
-                      ? new Date(request.created_at).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })
-                      : "N/A"}
+                  {formatDateISO(fullRequest.created_at || request.created_at)}
                 </p>
               </div>
             </div>

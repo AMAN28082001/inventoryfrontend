@@ -13,6 +13,7 @@ import CreateUserModal from "@/components/modals/create-user-modal"
 import { useStockRequestsState } from "@/hooks/use-stock-requests-state"
 import { usersApi, stockReturnsApi, productsApi } from "@/lib/api"
 import { authService, type User } from "@/lib/auth"
+import { formatDateISO } from "@/lib/utils"
 import type { StockRequest, StockReturn, Product } from "@/lib/api"
 
 interface AdminDashboardProps {
@@ -47,21 +48,14 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
   const currentUser = authService.getUser()
 
   // Load agents created by this admin
+  // Backend automatically filters - admins only receive agents they created
   useEffect(() => {
     const loadMyAgents = async () => {
       if (!currentUserId) return
       try {
         setLoadingAgents(true)
-        // Fetch all agents
-        const allAgents = await usersApi.getAll("agent")
-        // Filter to only agents created by this admin
-        // Check both created_by_id and admin_id fields (backend might use either)
-        const myAgentsList = allAgents.filter(agent => 
-          agent.created_by_id === currentUserId || 
-          agent.admin_id === currentUserId ||
-          // If backend stores creator info in a different way, check that too
-          (agent as any).created_by === currentUserId
-        )
+        // Backend filters agents - admins only see agents they created
+        const myAgentsList = await usersApi.getAll("agent")
         setMyAgents(myAgentsList)
       } catch (err) {
         console.error("Failed to load agents:", err)
@@ -75,15 +69,14 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
   }, [currentUserId])
 
   // Load stock returns from agents
+  // Backend automatically filters - admins only receive returns from their agents
   useEffect(() => {
     const loadStockReturns = async () => {
       if (!currentUserId) return
       try {
         setLoadingReturns(true)
-        // Fetch all stock returns for this admin (from their agents)
-        // The backend should associate agent returns with their admin_id
+        // Backend filters returns - admins only see returns with admin_id = currentUserId
         const allReturns = await stockReturnsApi.getAll({ 
-          admin_id: currentUserId,
           status: "pending"
         })
         setStockReturns(allReturns)
@@ -109,9 +102,8 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
     try {
       setProcessingReturnIds((prev) => new Set(prev).add(returnId))
       await stockReturnsApi.process(returnId)
-      // Reload stock returns to update the list
+      // Reload stock returns to update the list (backend automatically filters)
       const updatedReturns = await stockReturnsApi.getAll({ 
-        admin_id: currentUserId,
         status: "pending"
       })
       setStockReturns(updatedReturns)
@@ -128,38 +120,12 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
     }
   }
 
-  // Get agent IDs created by this admin
-  const myAgentIds = myAgents.map(agent => agent.id)
-
-  // Get requests from agents created by this admin (where requested_from = "admin" AND requested_by_id is in myAgentIds)
-  const agentRequests = requests.requests.filter(r => 
-    r.requested_from === "admin" && 
-    r.requested_by_id && 
-    myAgentIds.includes(r.requested_by_id)
-  )
-  
-  // Get my requests to super-admin
-  const myRequestsToSuperAdmin = requests.requests.filter(
-    r => r.requested_from === "super-admin" && r.requested_by_id === currentUserId
-  )
-
-  // Get incoming admin transfer requests (requests sent TO this admin from other admins)
-  // requested_from = currentUserId means this admin is the recipient
-  const incomingAdminTransfers = requests.requests.filter(
-    r => r.requested_from === currentUserId && r.requested_by_id !== currentUserId
-  )
-
-  // Get outgoing admin transfer requests (requests sent BY this admin to other admins)
-  // requested_by_id = currentUserId AND requested_from is an admin ID (not "super-admin" or "admin")
-  const outgoingAdminTransfers = requests.requests.filter(
-    r => r.requested_by_id === currentUserId && 
-         r.requested_from !== "super-admin" && 
-         r.requested_from !== "admin" &&
-         r.requested_from !== currentUserId
-  )
-
-  // Combine all requests for metrics
-  const allRequests = [...agentRequests, ...myRequestsToSuperAdmin, ...incomingAdminTransfers, ...outgoingAdminTransfers]
+  // Backend automatically filters stock requests based on role:
+  // - Requests from agents created by this admin
+  // - This admin's own requests to super-admin
+  // - Admin-to-admin transfers (incoming and outgoing)
+  // No additional client-side filtering needed for role-based access
+  const allRequests = requests.requests
   
   // Sort by date (most recent first - descending order)
   const sortedRequests = [...allRequests].sort((a, b) => {
@@ -388,7 +354,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                 setShowRequestModal(true)
               }}
               variant="outline"
-              className="border-blue-600 text-blue-400 hover:bg-blue-950 text-sm sm:text-base w-full sm:w-auto"
+              className="border-blue-600 text-blue-400 hover:bg-blue-950 hover:text-blue-400 hover:brightness-110 text-sm sm:text-base w-full sm:w-auto"
               size="sm"
             >
             <Plus className="w-4 h-4 mr-2" />
@@ -397,7 +363,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
             <Button
               onClick={() => setShowStockReturnModal(true)}
               variant="outline"
-              className="border-amber-600 text-amber-400 hover:bg-amber-950 text-sm sm:text-base w-full sm:w-auto"
+              className="border-amber-600 text-amber-400 hover:bg-amber-950 hover:text-amber-400 hover:brightness-110 text-sm sm:text-base w-full sm:w-auto"
               size="sm"
             >
               <RotateCcw className="w-4 h-4 mr-2" />
@@ -406,7 +372,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
             <Button
               onClick={() => setShowCreateUserModal(true)}
               variant="outline"
-              className="border-slate-600 text-slate-300 hover:bg-slate-700 text-sm sm:text-base w-full sm:w-auto"
+              className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-slate-300 hover:brightness-110 text-sm sm:text-base w-full sm:w-auto"
               size="sm"
             >
               <UserPlus className="w-4 h-4 mr-2" />
@@ -534,11 +500,11 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                       <div>
                         <p className="text-slate-400 text-xs">Date</p>
                         <p className="text-slate-300">
-                          {request.created_at ? new Date(request.created_at).toLocaleDateString() : "N/A"}
+                          {formatDateISO(request.created_at)}
                         </p>
                       </div>
-                    </div>
-                    
+        </div>
+
                     <div className="pt-2 border-t border-slate-700">
                       {(isAgentRequest || isIncomingAdminTransfer) && request.status === "pending" && (
                         <Button
@@ -631,7 +597,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                           )}
                         </td>
                         <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
-                          {request.created_at ? new Date(request.created_at).toLocaleDateString() : "N/A"}
+                          {formatDateISO(request.created_at)}
                       </td>
                         <td className="px-4 xl:px-6 py-3 xl:py-4">
                         {request.status === "pending" && (
@@ -721,7 +687,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                     <p className="text-sm text-white font-medium">
                       {request.items?.[0]?.product?.name || "Multiple Products"}
                     </p>
-                    <p className="text-xs text-slate-400">{request.created_at ? new Date(request.created_at).toLocaleDateString() : "N/A"}</p>
+                    <p className="text-xs text-slate-400">{formatDateISO(request.created_at)}</p>
                   </div>
                   <span className="text-sm font-bold text-cyan-400">
                     {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
@@ -828,7 +794,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                       <div>
                         <p className="text-slate-400 text-xs">Date</p>
                         <p className="text-slate-300 text-sm">
-                          {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                          {formatDateISO(ret.created_at)}
                         </p>
                       </div>
                     </div>
@@ -890,7 +856,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                         <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-300 text-sm">{agentName}</td>
                         <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm max-w-xs truncate">{ret.reason || "N/A"}</td>
                         <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
-                          {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                          {formatDateISO(ret.created_at)}
                         </td>
                         <td className="px-4 xl:px-6 py-3 xl:py-4">
                           <Button

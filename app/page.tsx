@@ -98,7 +98,7 @@ export default function Home() {
               variant="outline"
               size="sm"
               onClick={handleLogout}
-              className="border-slate-600 text-slate-300 hover:bg-slate-800 bg-transparent text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 md:h-9 px-2 sm:px-3 md:px-4 whitespace-nowrap flex-shrink-0"
+              className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-slate-300 hover:brightness-110 bg-transparent text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 md:h-9 px-2 sm:px-3 md:px-4 whitespace-nowrap flex-shrink-0"
             >
               <span className="hidden sm:inline">Logout</span>
               <span className="sm:hidden">Out</span>

@@ -62,6 +62,11 @@ export function useProducts(initialData: Product[] = []): UseApiDataResult<Produ
 
 /**
  * Hook to fetch sales from API
+ * 
+ * NOTE: Backend automatically filters sales based on authenticated user's role:
+ * - Agents: Only their own sales (created_by_id = current_user.id)
+ * - Admins: Their own sales + sales from agents they created
+ * - Account & Super-Admin: All sales
  */
 export function useSales(initialData: Sale[] = []): UseApiDataResult<Sale> & {
   data: Sale[]
@@ -74,6 +79,7 @@ export function useSales(initialData: Sale[] = []): UseApiDataResult<Sale> & {
     try {
       setLoading(true)
       setError(null)
+      // Backend returns pre-filtered sales based on user role
       const sales = await salesApi.getAll()
       // Transform API data to match frontend format
       const transformedSales = sales.map((s) => ({
@@ -113,6 +119,12 @@ export function useSales(initialData: Sale[] = []): UseApiDataResult<Sale> & {
 
 /**
  * Hook to fetch stock requests from API
+ * 
+ * NOTE: Backend automatically filters stock requests based on authenticated user's role:
+ * - Agents: Only their own requests (requested_by_id = current_user.id)
+ * - Admins: Requests from their agents + their own requests + admin-to-admin transfers
+ * - Super-Admin: Requests coming to super-admin
+ * - Account: All requests
  */
 export function useStockRequests(
   initialData: StockRequest[] = []
@@ -127,6 +139,7 @@ export function useStockRequests(
     try {
       setLoading(true)
       setError(null)
+      // Backend returns pre-filtered requests based on user role
       const requests = await stockRequestsApi.getAll()
       // Transform API data to match frontend format
       const transformedRequests = requests.map((r) => ({

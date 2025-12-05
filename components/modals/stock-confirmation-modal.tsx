@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { X, Upload, Image as ImageIcon, Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import type { StockRequest } from "@/lib/api"
 import { stockRequestsApi, productsApi, type Product } from "@/lib/api"
-import { formatImageUrl } from "@/lib/utils"
+import { formatImageUrl, formatDateISO, formatDateTimeISO } from "@/lib/utils"
 
 interface StockConfirmationModalProps {
   request: StockRequest
@@ -157,7 +157,7 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
             {fullRequest.dispatched_at && (
               <div>
                 <p className="text-slate-400 text-sm">Dispatched On</p>
-                <p className="text-white">{new Date(fullRequest.dispatched_at).toLocaleString()}</p>
+                <p className="text-white">{formatDateTimeISO(fullRequest.dispatched_at)}</p>
               </div>
             )}
           </div>
@@ -265,7 +265,7 @@ export default function StockConfirmationModal({ request, onConfirm, onClose }: 
                 ✓ Stock receipt has been confirmed
               </p>
               <p className="text-slate-400 text-xs text-center mt-1">
-                Confirmed on {fullRequest.confirmed_at ? new Date(fullRequest.confirmed_at).toLocaleString() : "N/A"}
+                Confirmed on {formatDateTimeISO(fullRequest.confirmed_at)}
               </p>
             </div>
           )}

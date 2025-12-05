@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useMemo, useEffect } from "react"
-import type { StockRequest } from "@/lib/types"
+import type { StockRequest } from "@/lib/api"
 import { useStockRequests } from "./use-api-data"
 import { stockRequestsApi } from "@/lib/api"
 
@@ -28,7 +28,7 @@ export function useStockRequestsState(initialRequests: StockRequest[] = []) {
           })),
           notes: request.notes,
         })
-        setRequests((prev) => [...prev, { ...created, requestedDate: created.created_at, rejectionReason: created.rejection_reason } as StockRequest])
+        setRequests((prev) => [...prev, created])
         await refetch()
       } catch (err) {
         console.error("Error creating stock request:", err)
@@ -43,7 +43,7 @@ export function useStockRequestsState(initialRequests: StockRequest[] = []) {
       try {
         const updated = await stockRequestsApi.dispatch(requestId, { dispatch_image: dispatchImage })
         setRequests((prev) =>
-          prev.map((r) => (r.id === requestId ? { ...r, status: updated.status, requestedDate: updated.dispatched_at || updated.created_at } : r))
+          prev.map((r) => (r.id === requestId ? updated : r))
         )
         await refetch()
       } catch (err) {
@@ -59,7 +59,7 @@ export function useStockRequestsState(initialRequests: StockRequest[] = []) {
       try {
         await stockRequestsApi.dispatch(requestId, { rejection_reason: reason })
         setRequests((prev) =>
-          prev.map((r) => (r.id === requestId ? { ...r, status: "rejected" as const, rejectionReason: reason } : r))
+          prev.map((r) => (r.id === requestId ? { ...r, status: "rejected" as const, rejection_reason: reason } : r))
         )
         await refetch()
       } catch (err) {
@@ -102,12 +102,14 @@ export function useStockRequestsState(initialRequests: StockRequest[] = []) {
   )
 
   const getRequestsByAdmin = useCallback(
-    (adminName: string) => requests.filter((r) => r.adminName === adminName),
+    (adminName: string) => requests.filter((r) => r.requested_by_name === adminName),
     [requests],
   )
 
   const getTotalRequestedQuantity = useCallback(() => {
-    return requests.reduce((sum, r) => sum + r.quantity, 0)
+    return requests.reduce((sum, r) => {
+      return sum + (r.items?.reduce((itemSum, item) => itemSum + item.quantity, 0) || 0)
+    }, 0)
   }, [requests])
 
   const getApprovalRate = useCallback(() => {

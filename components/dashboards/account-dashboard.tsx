@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { CheckCircle, XCircle, Loader2, AlertCircle, UserCheck, UserX, Search, Filter, Download, ShoppingCart } from "lucide-react"
 import { usersApi, salesApi, productsApi } from "@/lib/api"
 import { generateQuotationPDF } from "@/lib/quotation-generator"
+import { formatDateISO } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import type { User } from "@/lib/auth"
 import type { Sale, Product } from "@/lib/api"
@@ -81,11 +82,12 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
     fetchAgents()
   }, [fetchAgents])
 
-  // Fetch all agent sales
+  // Fetch all agent sales - Backend automatically returns all sales for Account role
   useEffect(() => {
     const fetchSales = async () => {
       try {
         setLoadingSales(true)
+        // Backend filters: Account role receives all sales from all agents
         const allSales = await salesApi.getAll()
         setSales(allSales)
       } catch (err: any) {
@@ -414,7 +416,7 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
                         <td className="py-4 px-4">
                           <p className="text-slate-400 text-sm">
                             {agent.created_at
-                              ? new Date(agent.created_at).toLocaleDateString()
+                              ? formatDateISO(agent.created_at)
                               : "N/A"}
                           </p>
                         </td>
@@ -592,7 +594,7 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
                             </td>
                             <td className="py-4 px-4">
                               <p className="text-slate-400 text-sm">
-                                {sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A"}
+                                {formatDateISO(sale.created_at)}
                               </p>
                             </td>
                             <td className="py-4 px-4">
@@ -602,7 +604,7 @@ export default function AccountDashboard({ userName }: AccountDashboardProps) {
                                   onClick={() => handleDownloadQuotation(sale)}
                                   disabled={downloadingSaleId === sale.id}
                                   variant="outline"
-                                  className="border-blue-600 text-blue-400 hover:bg-blue-950"
+                                  className="border-blue-600 text-blue-400 hover:bg-blue-950 hover:text-blue-400 hover:brightness-110"
                                 >
                                   {downloadingSaleId === sale.id ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />

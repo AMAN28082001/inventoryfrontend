@@ -12,6 +12,7 @@ import { useInventoryState } from "@/hooks/use-inventory-state"
 import { useStockRequestsState } from "@/hooks/use-stock-requests-state"
 import { productsApi, stockRequestsApi, categoriesApi, usersApi, stockReturnsApi } from "@/lib/api"
 import { authService, type User } from "@/lib/auth"
+import { formatDateISO } from "@/lib/utils"
 import type { Product } from "@/lib/api"
 import type { StockRequest, StockReturn } from "@/lib/api"
 
@@ -21,7 +22,12 @@ interface SuperAdminDashboardProps {
 
 export default function SuperAdminDashboard({ userName }: SuperAdminDashboardProps) {
   const inventory = useInventoryState([])
-  const requests = useStockRequestsState([])
+  const requestsState = useStockRequestsState([])
+  // Explicitly type requests to ensure correct type inference
+  const requests = {
+    ...requestsState,
+    requests: requestsState.requests as StockRequest[]
+  }
   
   const [showProductModal, setShowProductModal] = useState(false)
   const [showApprovalModal, setShowApprovalModal] = useState(false)
@@ -64,10 +70,11 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
   }, [])
 
   // Load pending agents (agents created by admins that need approval)
+  // Backend filters: super-admin receives all agents, we filter for inactive ones client-side
   const loadPendingAgents = useCallback(async () => {
     try {
       setLoadingAgents(true)
-      // Fetch all agents
+      // Backend returns all agents for super-admin
       const allAgents = await usersApi.getAll("agent")
       // Filter for inactive agents (those needing approval) created by admins
       // Only show agents that are not active and were created by admins
@@ -210,29 +217,27 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
 
   const handleApproveRequest = async () => {
     // The modal handles the approval itself, we just need to refetch and close
-    await requests.refetch()
+    await requestsState.refetch()
     setShowApprovalModal(false)
     setSelectedRequest(null)
   }
 
   const handleRejectRequest = async () => {
     // The modal handles the rejection itself, we just need to refetch and close
-    await requests.refetch()
+    await requestsState.refetch()
     setShowApprovalModal(false)
     setSelectedRequest(null)
   }
 
-  // Filter requests from admins only
-  const adminRequests = requests.requests.filter(r => r.requested_from === "super-admin")
-  
+  // Backend automatically filters - super-admin receives requests from admins only
   // Sort requests by date (most recent first)
-  const sortedAdminRequests = [...adminRequests].sort((a, b) => {
+  const sortedAdminRequests = [...requests.requests].sort((a, b) => {
     const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
     const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
     return dateB - dateA // Descending order (newest first)
   })
   
-  // Filter requests by user search
+  // Filter requests by user search (backend already filtered by role)
   const filteredAdminRequests = sortedAdminRequests.filter((r) => {
     if (!requestsSearchQuery.trim()) return true
     return r.requested_by_name?.toLowerCase().includes(requestsSearchQuery.toLowerCase()) || false
@@ -279,7 +284,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
     return dateB - dateA // Descending order (newest first)
   })
 
-  if (inventory.loading || requests.loading) {
+  if (inventory.loading || requestsState.loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -374,7 +379,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                 setEditingProduct(null)
                 setShowProductModal(true)
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2"
+              className="bg-blue-600 hover:bg-blue-700 text-white hover:text-slate-100 text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2"
             >
               <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               Add Product
@@ -436,7 +441,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                       <div className="flex gap-2 ml-2 sm:ml-4 flex-shrink-0">
                         <Button
                           onClick={() => {
-                            setEditingProduct(product)
+                            setEditingProduct(product as Product)
                             setShowProductModal(true)
                           }}
                           size="sm"
@@ -554,7 +559,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                       setSelectedRequest(request)
                       setShowApprovalModal(true)
                     }}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white text-xs mt-2"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white hover:text-slate-100 text-xs mt-2"
                   >
                     Review & Dispatch
                   </Button>
@@ -637,7 +642,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                     setSelectedRequest(request)
                     setShowApprovalModal(true)
                   }}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white text-xs mt-2"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white hover:text-slate-100 text-xs mt-2"
                 >
                   Review & Dispatch
                 </Button>
@@ -694,7 +699,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                       <div>
                         <p className="text-slate-400 text-xs">Created Date</p>
                         <p className="text-slate-300 text-sm">
-                          {agent.created_at ? new Date(agent.created_at).toLocaleDateString() : "N/A"}
+                          {formatDateISO(agent.created_at)}
                         </p>
                       </div>
                       <div className="pt-2 border-t border-slate-700 flex flex-col gap-2">
@@ -702,7 +707,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                           size="sm"
                           onClick={() => handleApproveAgent(agent.id)}
                           disabled={processingAgentIds.has(agent.id)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                          className="w-full bg-green-600 hover:bg-green-700 text-white hover:text-slate-100 text-xs"
                         >
                           {processingAgentIds.has(agent.id) ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -754,7 +759,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                           <td className="px-6 py-4 text-white font-medium">{agent.name}</td>
                           <td className="px-6 py-4 text-slate-300">{agent.username}</td>
                           <td className="px-6 py-4 text-slate-400">
-                            {agent.created_at ? new Date(agent.created_at).toLocaleDateString() : "N/A"}
+                            {formatDateISO(agent.created_at)}
                           </td>
                           <td className="px-6 py-4">
                             <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
@@ -767,7 +772,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                                 size="sm"
                                 onClick={() => handleApproveAgent(agent.id)}
                                 disabled={processingAgentIds.has(agent.id)}
-                                className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                                className="bg-green-600 hover:bg-green-700 text-white hover:text-slate-100 text-xs"
                               >
                                 {processingAgentIds.has(agent.id) ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -862,7 +867,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                           <div>
                             <p className="text-slate-400 text-xs">Date</p>
                             <p className="text-slate-300 text-sm">
-                              {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                              {formatDateISO(ret.created_at)}
                             </p>
                           </div>
                         </div>
@@ -877,7 +882,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                             size="sm"
                             onClick={() => handleProcessReturn(ret.id)}
                             disabled={processingReturnIds.has(ret.id)}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                            className="w-full bg-green-600 hover:bg-green-700 text-white hover:text-slate-100 text-xs"
                           >
                             {processingReturnIds.has(ret.id) ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -924,14 +929,14 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                             <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-300 text-sm">{adminName}</td>
                             <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm max-w-xs truncate">{ret.reason || "N/A"}</td>
                             <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
-                              {ret.created_at ? new Date(ret.created_at).toLocaleDateString() : "N/A"}
+                              {formatDateISO(ret.created_at)}
                             </td>
                             <td className="px-4 xl:px-6 py-3 xl:py-4">
                               <Button
                                 size="sm"
                                 onClick={() => handleProcessReturn(ret.id)}
                                 disabled={processingReturnIds.has(ret.id)}
-                                className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                                className="bg-green-600 hover:bg-green-700 text-white hover:text-slate-100 text-xs"
                               >
                                 {processingReturnIds.has(ret.id) ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -969,7 +974,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
               </h2>
               <Button
                 onClick={() => setShowCreateUserModal(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
+                className="bg-purple-600 hover:bg-purple-700 text-white hover:text-slate-100"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Create Admin
@@ -983,7 +988,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
               </p>
               <Button
                 onClick={() => setShowCreateUserModal(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
+                className="bg-purple-600 hover:bg-purple-700 text-white hover:text-slate-100"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Create Admin

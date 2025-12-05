@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { X, CheckCircle, XCircle } from "lucide-react"
+import { formatDateISO } from "@/lib/utils"
 import type { mockData } from "@/lib/mock-data"
 
 interface RequestApprovalModalProps {
@@ -54,7 +55,7 @@ export default function RequestApprovalModal({ request, onApprove, onReject, onC
               </div>
               <div>
                 <p className="text-slate-400 text-sm">Request Date</p>
-                <p className="text-white">{(request.requestedDate || request.created_at) ? new Date(request.requestedDate || request.created_at || "").toLocaleDateString() : "N/A"}</p>
+                <p className="text-white">{formatDateISO(request.requestedDate || request.created_at)}</p>
               </div>
             </div>
 

@@ -13,6 +13,7 @@ import { useStockRequestsState } from "@/hooks/use-stock-requests-state"
 import { authService } from "@/lib/auth"
 import { salesApi, productsApi } from "@/lib/api"
 import { generateQuotationPDF } from "@/lib/quotation-generator"
+import { formatDateISO } from "@/lib/utils"
 import type { Sale, Product } from "@/lib/api"
 import type { StockRequest } from "@/lib/api"
 
@@ -36,6 +37,10 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
 
   const currentUserId = authService.getUser()?.id
 
+  // NOTE: Backend automatically filters data based on authenticated user's role
+  // Agents will only receive their own sales and stock requests from the API
+  // No additional client-side filtering needed for role-based access
+  
   const handleDownloadQuotation = async (sale: Sale) => {
     try {
       setDownloadingSaleId(sale.id)
@@ -71,17 +76,15 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
     }
   }
 
-  // Filter my stock requests
-  const myRequests = requests.requests.filter(r => r.requested_by_id === currentUserId)
-  
+  // Backend filters stock requests - agents receive only their own requests
   // Sort requests by date (most recent first)
-  const sortedRequests = [...myRequests].sort((a, b) => {
+  const sortedRequests = [...requests.requests].sort((a, b) => {
     const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
     const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
     return dateB - dateA // Descending order (newest first)
   })
   
-  // Filter and sort requests by search query
+  // Filter requests by search query (backend already filtered by role)
   const filteredAndSortedRequests = sortedRequests.filter((r) => {
     if (!requestsSearchQuery.trim()) return true
     // Search in requested_by_name or notes
@@ -93,6 +96,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
   const pendingRequests = filteredAndSortedRequests.filter(r => r.status === "pending")
   const dispatchedRequests = filteredAndSortedRequests.filter(r => r.status === "dispatched")
 
+  // Backend filters sales - agents receive only their own sales
   // Sort sales by date (most recent first)
   const sortedSales = [...sales.sales].sort((a, b) => {
     const dateA = a.created_at ? new Date(a.created_at).getTime() : 
@@ -102,7 +106,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
     return dateB - dateA // Descending order (newest first)
   })
 
-  // Filter sales by type and customer search
+  // Filter sales by type and customer search (backend already filtered by role)
   const filteredSales = sortedSales.filter((s) => {
     const typeMatch = filterType === "all" || s.type === filterType
     const customerMatch = !salesSearchQuery.trim() || 
@@ -134,6 +138,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
     setSelectedRequest(null)
   }
 
+  // Calculate metrics based on sales (backend already filtered - agents only see their own)
   const b2bSales = sales.sales.filter((s) => s.type === "B2B")
   const b2cSales = sales.sales.filter((s) => s.type === "B2C")
   const totalRevenue = sales.sales.reduce((sum, s) => sum + (s.totalAmount || s.total_amount || 0), 0)
@@ -369,7 +374,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                         )}
                       </td>
                       <td className="px-6 py-4 text-slate-400">
-                        {(sale.saleDate || sale.created_at) ? new Date(sale.saleDate || sale.created_at || "").toLocaleDateString() : "N/A"}
+                        {formatDateISO(sale.saleDate || sale.created_at)}
                       </td>
                       <td className="px-6 py-4">
                         <Button
@@ -377,7 +382,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                           onClick={() => handleDownloadQuotation(sale)}
                           disabled={downloadingSaleId === sale.id}
                           variant="outline"
-                          className="border-blue-600 text-blue-400 hover:bg-blue-950 text-xs"
+                          className="border-blue-600 text-blue-400 hover:bg-blue-950 hover:text-blue-400 hover:brightness-110 text-xs"
                         >
                           {downloadingSaleId === sale.id ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -474,7 +479,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                     </p>
                     <p className="text-xs text-slate-400">
                       Qty: {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0} •{" "}
-                      {request.created_at ? new Date(request.created_at).toLocaleDateString() : "N/A"}
+                      {formatDateISO(request.created_at)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

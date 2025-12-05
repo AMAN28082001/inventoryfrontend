@@ -30,3 +30,43 @@ export function formatImageUrl(imageUrl?: string | null): string {
   const uploadsBaseUrl = apiBaseUrl.replace('/api', '/uploads')
   return `${uploadsBaseUrl}/${imageUrl}`
 }
+
+/**
+ * Format date to ISO format (YYYY-MM-DD)
+ * @param date - Date string, Date object, or null/undefined
+ * @returns ISO formatted date string (YYYY-MM-DD) or "N/A" if invalid
+ */
+export function formatDateISO(date: string | Date | null | undefined): string {
+  if (!date) return "N/A"
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) return "N/A"
+    
+    const year = dateObj.getFullYear()
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const day = String(dateObj.getDate()).padStart(2, '0')
+    
+    return `${year}-${month}-${day}`
+  } catch {
+    return "N/A"
+  }
+}
+
+/**
+ * Format datetime to ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)
+ * @param date - Date string, Date object, or null/undefined
+ * @returns ISO formatted datetime string or "N/A" if invalid
+ */
+export function formatDateTimeISO(date: string | Date | null | undefined): string {
+  if (!date) return "N/A"
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) return "N/A"
+    
+    return dateObj.toISOString()
+  } catch {
+    return "N/A"
+  }
+}
