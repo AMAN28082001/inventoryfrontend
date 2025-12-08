@@ -129,8 +129,8 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
   
   // Sort by date (most recent first - descending order)
   const sortedRequests = [...allRequests].sort((a, b) => {
-    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+    const dateA = (a.requested_date || a.created_at) ? new Date(a.requested_date || a.created_at).getTime() : 0
+    const dateB = (b.requested_date || b.created_at) ? new Date(b.requested_date || b.created_at).getTime() : 0
     return dateB - dateA // Descending order (newest first)
   })
 
@@ -213,7 +213,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
   const inProgress = pending
   const completed = approved + rejected
   const requestsThisMonth = allRequests.filter(
-    (r) => r.created_at ? new Date(r.created_at).getMonth() === new Date().getMonth() : false,
+    (r) => (r.requested_date || r.created_at) ? new Date(r.requested_date || r.created_at).getMonth() === new Date().getMonth() : false,
   ).length
 
   if (requests.loading) {
@@ -460,7 +460,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-semibold text-sm truncate">
-                          {request.items?.[0]?.product?.name || "Multiple Products"}
+                          {request.primary_product_name || request.items?.[0]?.product?.name || "Multiple Products"}
                         </p>
                         <p className="text-xs text-slate-400 mt-1">
                           {request.requested_by_name || "Unknown"}
@@ -500,7 +500,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                       <div>
                         <p className="text-slate-400 text-xs">Date</p>
                         <p className="text-slate-300">
-                          {formatDateISO(request.created_at)}
+                          {formatDateISO(request.requested_date || request.created_at)}
                         </p>
                       </div>
         </div>
@@ -582,7 +582,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                     return (
                     <tr key={request.id} className="hover:bg-slate-700/30 transition">
                         <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-medium text-sm">
-                          {request.items?.[0]?.product?.name || "Multiple Products"}
+                          {request.primary_product_name || request.items?.[0]?.product?.name || "Multiple Products"}
                         </td>
                         <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-bold text-cyan-400 text-sm">
                           {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
@@ -597,7 +597,7 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                           )}
                         </td>
                         <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-sm">
-                          {formatDateISO(request.created_at)}
+                          {formatDateISO(request.requested_date || request.created_at)}
                       </td>
                         <td className="px-4 xl:px-6 py-3 xl:py-4">
                         {request.status === "pending" && (
@@ -685,9 +685,9 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
                 >
                   <div>
                     <p className="text-sm text-white font-medium">
-                      {request.items?.[0]?.product?.name || "Multiple Products"}
+                      {request.primary_product_name || request.items?.[0]?.product?.name || "Multiple Products"}
                     </p>
-                    <p className="text-xs text-slate-400">{formatDateISO(request.created_at)}</p>
+                    <p className="text-xs text-slate-400">{formatDateISO(request.requested_date || request.created_at)}</p>
                   </div>
                   <span className="text-sm font-bold text-cyan-400">
                     {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}

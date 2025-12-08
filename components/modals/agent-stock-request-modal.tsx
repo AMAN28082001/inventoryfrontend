@@ -334,7 +334,7 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
               
               <AddressFields
                 address={b2bFields.billing_address}
-                onChange={(address) => setB2bFields({ ...b2bFields, billing_address: address })}
+                onChange={(address: Address) => setB2bFields({ ...b2bFields, billing_address: address })}
                 label="Billing Address"
                 required
               />
@@ -360,7 +360,7 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
               {!b2bFields.delivery_matches_billing && (
                 <AddressFields
                   address={b2bFields.delivery_address}
-                  onChange={(address) => setB2bFields({ ...b2bFields, delivery_address: address })}
+                  onChange={(address: Address) => setB2bFields({ ...b2bFields, delivery_address: address })}
                   label="Delivery Address"
                   required
                 />
@@ -409,7 +409,7 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
               
               <AddressFields
                 address={b2cFields.billing_address}
-                onChange={(address) => setB2cFields({ ...b2cFields, billing_address: address })}
+                onChange={(address: Address) => setB2cFields({ ...b2cFields, billing_address: address })}
                 label="Billing Address"
                 required
               />
@@ -435,7 +435,7 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
               {!b2cFields.delivery_matches_billing && (
                 <AddressFields
                   address={b2cFields.delivery_address}
-                  onChange={(address) => setB2cFields({ ...b2cFields, delivery_address: address })}
+                  onChange={(address: Address) => setB2cFields({ ...b2cFields, delivery_address: address })}
                   label="Delivery Address"
                   required
                 />
@@ -544,4 +544,3 @@ export default function AgentStockRequestModal({ onClose, onSuccess }: AgentStoc
     </div>
   )
 }
-

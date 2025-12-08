@@ -5,7 +5,7 @@ import type { StockRequest } from "@/lib/api"
 import { useStockRequests } from "./use-api-data"
 import { stockRequestsApi } from "@/lib/api"
 
-export function useStockRequestsState(initialRequests: StockRequest[] = []) {
+function useStockRequestsState(initialRequests: StockRequest[] = []) {
   const shouldFetchFromApi = initialRequests.length === 0
   const { data: apiRequests, loading, error, refetch } = useStockRequests(shouldFetchFromApi ? [] : initialRequests)
   const [requests, setRequests] = useState<StockRequest[]>(shouldFetchFromApi ? apiRequests : initialRequests)
@@ -135,3 +135,5 @@ export function useStockRequestsState(initialRequests: StockRequest[] = []) {
     refetch,
   }
 }
+
+export { useStockRequestsState }

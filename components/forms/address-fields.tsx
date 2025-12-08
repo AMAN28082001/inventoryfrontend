@@ -1,8 +1,8 @@
 "use client"
 
-interface Address {
+export interface Address {
   line1: string
-  line2: string
+  line2?: string
   city: string
   state: string
   postal_code: string
@@ -16,7 +16,7 @@ interface AddressFieldsProps {
   required?: boolean
 }
 
-export default function AddressFields({ address, onChange, label = "Address", required = false }: AddressFieldsProps) {
+function AddressFields({ address, onChange, label = "Address", required = false }: AddressFieldsProps) {
   const updateField = (field: keyof Address, value: string) => {
     onChange({ ...address, [field]: value })
   }
@@ -24,9 +24,7 @@ export default function AddressFields({ address, onChange, label = "Address", re
   return (
     <div className="space-y-4">
       {label && (
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          {label} {required && <span className="text-red-400">*</span>}
-        </label>
+        <h4 className="text-sm font-medium text-slate-300">{label} {required && <span className="text-red-400">*</span>}</h4>
       )}
       
       <div>
@@ -39,18 +37,18 @@ export default function AddressFields({ address, onChange, label = "Address", re
           onChange={(e) => updateField("line1", e.target.value)}
           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
           required={required}
-          placeholder="Street address, P.O. box"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">Address Line 2</label>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          Address Line 2
+        </label>
         <input
           type="text"
-          value={address.line2}
+          value={address.line2 || ""}
           onChange={(e) => updateField("line2", e.target.value)}
           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-          placeholder="Apartment, suite, unit, building, floor, etc."
         />
       </div>
 
@@ -70,7 +68,7 @@ export default function AddressFields({ address, onChange, label = "Address", re
 
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            State/Province {required && <span className="text-red-400">*</span>}
+            State {required && <span className="text-red-400">*</span>}
           </label>
           <input
             type="text"
@@ -85,7 +83,7 @@ export default function AddressFields({ address, onChange, label = "Address", re
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            Postal/ZIP Code {required && <span className="text-red-400">*</span>}
+            Postal Code {required && <span className="text-red-400">*</span>}
           </label>
           <input
             type="text"
@@ -106,7 +104,6 @@ export default function AddressFields({ address, onChange, label = "Address", re
             onChange={(e) => updateField("country", e.target.value)}
             className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             required={required}
-            placeholder="e.g., India, USA"
           />
         </div>
       </div>
@@ -114,5 +111,4 @@ export default function AddressFields({ address, onChange, label = "Address", re
   )
 }
 
-export type { Address }
-
+export default AddressFields

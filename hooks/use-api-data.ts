@@ -15,7 +15,7 @@ interface UseApiDataResult<T> {
 /**
  * Hook to fetch products from API
  */
-export function useProducts(initialData: Product[] = []): UseApiDataResult<Product> & {
+function useProducts(initialData: Product[] = []): UseApiDataResult<Product> & {
   data: Product[]
 } {
   const [data, setData] = useState<Product[]>(initialData)
@@ -68,7 +68,7 @@ export function useProducts(initialData: Product[] = []): UseApiDataResult<Produ
  * - Admins: Their own sales + sales from agents they created
  * - Account & Super-Admin: All sales
  */
-export function useSales(initialData: Sale[] = []): UseApiDataResult<Sale> & {
+function useSales(initialData: Sale[] = []): UseApiDataResult<Sale> & {
   data: Sale[]
 } {
   const [data, setData] = useState<Sale[]>(initialData)
@@ -126,7 +126,7 @@ export function useSales(initialData: Sale[] = []): UseApiDataResult<Sale> & {
  * - Super-Admin: Requests coming to super-admin
  * - Account: All requests
  */
-export function useStockRequests(
+function useStockRequests(
   initialData: StockRequest[] = []
 ): UseApiDataResult<StockRequest> & {
   data: StockRequest[]
@@ -144,11 +144,11 @@ export function useStockRequests(
       // Transform API data to match frontend format
       const transformedRequests = requests.map((r) => ({
         ...r,
-        requestedDate: r.created_at,
+        requestedDate: r.requested_date || r.created_at,
         rejectionReason: r.rejection_reason,
         adminName: r.requested_by_name || "Unknown",
-        // For backward compatibility with single-item requests
-        productName: r.items?.[0]?.product?.name || "Multiple Products",
+        // Use primary_product_name from backend, fallback to first item product name
+        productName: r.primary_product_name || r.items?.[0]?.product?.name || "Multiple Products",
         model: r.items?.[0]?.product?.model || "",
         quantity: r.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
         status: r.status, // Keep original status (pending, dispatched, confirmed, rejected)
@@ -179,4 +179,6 @@ export function useStockRequests(
     refetch: fetchData,
   }
 }
+
+export { useProducts, useSales, useStockRequests }
 

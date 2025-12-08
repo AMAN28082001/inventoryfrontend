@@ -175,6 +175,10 @@ export const categoriesApi = {
   async getByLabel(label: string): Promise<Category> {
     return apiClient.get<Category>(`/categories/${label}`)
   },
+
+  async create(label: string): Promise<Category> {
+    return apiClient.post<Category>("/categories", { label })
+  },
 }
 
 // Stock Requests API
@@ -203,6 +207,9 @@ export interface StockRequest {
   updated_at: string
   dispatched_at?: string
   confirmed_at?: string
+  // Backend fields
+  primary_product_name?: string
+  requested_date?: string
   // Legacy fields for backward compatibility
   productName?: string
   model?: string

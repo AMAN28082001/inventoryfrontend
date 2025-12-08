@@ -202,7 +202,23 @@ export function generateQuotationPDF(sale: SaleWithAddresses, products: Record<s
     doc.setFont('helvetica', 'bold')
     doc.text('Dated:', pageWidth - 60, yPos)
     doc.setFont('helvetica', 'normal')
-    const saleDate = sale.created_at ? new Date(sale.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+    // Use sale_date from backend, fallback to saleDate, then created_at
+    const saleAny = sale as any
+    const dateSource = saleAny.sale_date || saleAny.saleDate || sale.created_at
+    let saleDate = new Date().toISOString().split('T')[0] // Default to today
+    
+    if (dateSource) {
+      try {
+        const parsedDate = new Date(dateSource)
+        if (!isNaN(parsedDate.getTime())) {
+          saleDate = parsedDate.toISOString().split('T')[0]
+        }
+      } catch (e) {
+        console.error("Error parsing date:", e)
+        // Keep default date
+      }
+    }
+    
     doc.text(saleDate, pageWidth - 40, yPos)
     yPos += 10
 
@@ -328,18 +344,18 @@ export function generateQuotationPDF(sale: SaleWithAddresses, products: Record<s
 
     autoTable(doc, {
       startY: yPos,
-      head: [['SI No.', 'Description of Goods', 'HSN/SAC', 'Due on', 'Quantity', 'Rate', 'per', 'Amount']],
+      head: [['SI No.', 'Description of Goods', 'HSN/SAC', 'Due on', 'Quantity', 'Rate', 'Unit', 'Amount']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
       styles: { fontSize: 8, cellPadding: 2 },
       columnStyles: {
-        0: { cellWidth: 15 }, // SI No.
+        0: { cellWidth: 12 }, // SI No.
         1: { cellWidth: 50 }, // Description
-        2: { cellWidth: 25 }, // HSN/SAC
+        2: { cellWidth: 20 }, // HSN/SAC
         3: { cellWidth: 20 }, // Due on
         4: { cellWidth: 20 }, // Quantity
-        5: { cellWidth: 25 }, // Rate
+        5: { cellWidth: 20 }, // Rate
         6: { cellWidth: 15 }, // per
         7: { cellWidth: 25 }, // Amount
       },
@@ -373,31 +389,48 @@ export function generateQuotationPDF(sale: SaleWithAddresses, products: Record<s
     const total = Math.max(0, Math.round(totalBeforeRound))
 
     doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
     // Calculate GST percentage for display
     const gstPercent = taxAmount > 0 && safeSubtotal > 0 
       ? Math.round((taxAmount / safeSubtotal) * 100) 
       : Math.round(gstRate)
     const cgstPercentDisplay = Math.round(gstPercent / 2)
     
-    doc.text(`Subtotal: ${formatNumber(safeSubtotal)}`, pageWidth - 50, yPos)
+    // Two-column layout: Labels at left, values at extreme right (3rd part of page)
+    // Calculate label position (around 65% of page width for labels - 3rd part of page)
+    const labelPosition = pageWidth * 0.65
+    
+    // Subtotal
+    doc.text('Subtotal:', labelPosition, yPos, { align: 'left' })
+    doc.text(formatNumber(safeSubtotal), pageWidth - margin, yPos, { align: 'right' })
     yPos += 6
-    doc.text(`C GST (${cgstPercentDisplay}%): ${formatNumber(safeCgst)}`, pageWidth - 50, yPos)
+    
+    // C GST
+    doc.text(`C GST (${cgstPercentDisplay}%):`, labelPosition, yPos, { align: 'left' })
+    doc.text(formatNumber(safeCgst), pageWidth - margin, yPos, { align: 'right' })
     yPos += 6
-    doc.text(`S GST (${cgstPercentDisplay}%): ${formatNumber(safeSgst)}`, pageWidth - 50, yPos)
+    
+    // S GST
+    doc.text(`S GST (${cgstPercentDisplay}%):`, labelPosition, yPos, { align: 'left' })
+    doc.text(formatNumber(safeSgst), pageWidth - margin, yPos, { align: 'right' })
     yPos += 6
 
+    // ROUND OFF
     if (Math.abs(roundOff) > 0.001) {
-      doc.text(`Less: ROUND OFF: ${roundOff < 0 ? '(-)' : ''}${formatNumber(Math.abs(roundOff))}`, pageWidth - 50, yPos)
+      doc.text(`ROUND OFF:`, labelPosition, yPos, { align: 'left' })
+      doc.text(`${roundOff < 0 ? '(-)' : ''}${formatNumber(Math.abs(roundOff))}`, pageWidth - margin, yPos, { align: 'right' })
       yPos += 6
     }
 
-    doc.text(`Total Quantity: ${totalQuantity.toFixed(1)} PCS`, pageWidth - 50, yPos)
+    // Total Quantity
+    doc.text('Total Quantity:', labelPosition, yPos, { align: 'left' })
+    doc.text(`${totalQuantity.toFixed(1)} PCS`, pageWidth - margin, yPos, { align: 'right' })
     yPos += 6
 
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
-    doc.text(`Total Amount: ₹ ${formatNumber(total)} (E. & O.E)`, pageWidth - 50, yPos)
-    yPos += 8
+    // Total Amount
+    doc.text('Total Amount:', labelPosition, yPos, { align: 'left' })
+    doc.text(formatNumber(total), pageWidth - margin, yPos, { align: 'right' })
+    yPos += 6
 
     // Amount in Words
     doc.setFontSize(10)
@@ -428,13 +461,15 @@ export function generateQuotationPDF(sale: SaleWithAddresses, products: Record<s
     doc.text(`Branch & IFS Code: ${BANK_DETAILS.branch} & ${BANK_DETAILS.ifscCode}`, margin, yPos)
     yPos += 10
 
-    // Footer
+    // Footer - both at the bottom of the page
+    const pageHeight = doc.internal.pageSize.height
     doc.setFontSize(9)
     doc.setFont('helvetica', 'italic')
-    doc.text('This is a Computer Generated Document', pageWidth / 2, pageWidth - 10, { align: 'center' })
-    yPos += 5
+    // Left side - Computer Generated Document
+    doc.text('This is a Computer Generated Document', margin, pageHeight - 10, { align: 'left' })
+    // Right side - Authorised Signatory
     doc.setFont('helvetica', 'normal')
-    doc.text('Authorised Signatory', pageWidth - 30, pageWidth - 5)
+    doc.text('Authorised Signatory', pageWidth - margin, pageHeight - 10, { align: 'right' })
 
     // Generate filename
     const filename = `Quotation_${sale.id.substring(0, 8)}_${saleDate.replace(/\//g, '-')}.pdf`

@@ -153,10 +153,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-black to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Custom Cursor Effect */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-black to-slate-900 flex items-center justify-center p-3 sm:p-4 relative overflow-hidden">
+      {/* Custom Cursor Effect - Hidden on mobile */}
       <div 
-        className="fixed pointer-events-none z-50 mix-blend-difference transition-all duration-300 ease-out"
+        className="hidden md:block fixed pointer-events-none z-50 mix-blend-difference transition-all duration-300 ease-out"
         style={{
           left: `${mousePosition.x}px`,
           top: `${mousePosition.y}px`,
@@ -198,52 +198,53 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo Section with Enhanced Design */}
-        <div className="text-center mb-8 animate-fade-in">
+        <div className="text-center mb-4 sm:mb-8 animate-fade-in">
           <div 
-            className="inline-flex items-center justify-center mb-6 relative transition-transform duration-300 ease-out"
+            className="inline-flex items-center justify-center mb-3 sm:mb-6 relative md:transition-transform md:duration-300 md:ease-out"
             style={{
-              transform: `translate(${logoTransform.x}px, ${logoTransform.y}px)`
+              transform: typeof window !== 'undefined' && window.innerWidth >= 768 ? `translate(${logoTransform.x}px, ${logoTransform.y}px)` : 'none'
             }}
           >
             {/* Logo Image */}
             <div className="relative group cursor-pointer">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl blur-xl animate-pulse group-hover:scale-110 transition-transform duration-300"></div>
-              <div className="relative bg-white/5 backdrop-blur-sm p-4 rounded-2xl border border-white/10 shadow-2xl group-hover:border-blue-500/50 transition-all duration-300 group-hover:shadow-blue-500/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl sm:rounded-2xl blur-xl animate-pulse group-hover:scale-110 transition-transform duration-300"></div>
+              <div className="relative bg-white/5 backdrop-blur-sm p-2 sm:p-4 rounded-xl sm:rounded-2xl border border-white/10 shadow-2xl group-hover:border-blue-500/50 transition-all duration-300 group-hover:shadow-blue-500/20">
                 <img 
                   src="https://res.cloudinary.com/du0cxgoic/image/upload/v1753789133/logo_Chairbord_Solar_1_1_avkjps.png" 
                   alt="Chairbord Solar Logo" 
-                  className="h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                  className="h-12 sm:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
             </div>
           </div>
           
-          <p className="text-slate-400 text-sm sm:text-base flex items-center justify-center gap-2">
-            <Sparkles className="w-4 h-4 text-blue-400" />
-            Solar Inventory Management System
-            <Sparkles className="w-4 h-4 text-cyan-400" />
+          <p className="text-slate-400 text-xs sm:text-sm md:text-base flex items-center justify-center gap-1 sm:gap-2 px-2">
+            <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-blue-400" />
+            <span className="hidden xs:inline">Solar Inventory Management System</span>
+            <span className="xs:hidden">Solar Inventory</span>
+            <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-cyan-400" />
           </p>
         </div>
 
         {/* Login Card with Enhanced Design */}
         <Card 
-          className="bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 shadow-2xl relative overflow-hidden animate-fade-in-up transition-transform duration-300 ease-out"
+          className="bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 shadow-2xl relative overflow-hidden animate-fade-in-up md:transition-transform md:duration-300 md:ease-out"
           style={{
-            transform: `translate(${cardTransform.x}px, ${cardTransform.y}px) rotateX(${cardTransform.y * 0.1}deg) rotateY(${cardTransform.x * 0.1}deg)`
+            transform: typeof window !== 'undefined' && window.innerWidth >= 768 ? `translate(${cardTransform.x}px, ${cardTransform.y}px) rotateX(${cardTransform.y * 0.1}deg) rotateY(${cardTransform.x * 0.1}deg)` : 'none'
           }}
         >
-          {/* Card Glow Effect - Follows cursor */}
+          {/* Card Glow Effect - Follows cursor - Hidden on mobile */}
           <div 
-            className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-blue-500/10 transition-opacity duration-500 pointer-events-none"
+            className="hidden md:block absolute inset-0 bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-blue-500/10 transition-opacity duration-500 pointer-events-none"
             style={{
               opacity: 0.5,
               background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(59, 130, 246, 0.15), rgba(6, 182, 212, 0.1), transparent 40%)`
             }}
           ></div>
           
-          {/* Cursor glow spot */}
+          {/* Cursor glow spot - Hidden on mobile */}
           <div 
-            className="absolute w-64 h-64 rounded-full blur-3xl pointer-events-none transition-all duration-700 ease-out opacity-30"
+            className="hidden md:block absolute w-64 h-64 rounded-full blur-3xl pointer-events-none transition-all duration-700 ease-out opacity-30"
             style={{
               left: `${mousePosition.x - 128}px`,
               top: `${mousePosition.y - 128}px`,
@@ -253,28 +254,28 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           ></div>
           
           {/* Card Content */}
-          <div className="relative p-8 sm:p-10">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Welcome Back</h2>
-              <p className="text-slate-400 text-sm">Sign in to access your dashboard</p>
+          <div className="relative p-5 sm:p-8 md:p-10">
+            <div className="text-center mb-6 sm:mb-8">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1 sm:mb-2">Welcome Back</h2>
+              <p className="text-slate-400 text-xs sm:text-sm">Sign in to access your dashboard</p>
             </div>
 
             {error && (
-              <div className="mb-6 p-4 bg-red-900/20 border border-red-700/50 rounded-lg flex items-start gap-3 animate-shake">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-400 flex-1">{error}</p>
+              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-900/20 border border-red-700/50 rounded-lg flex items-start gap-2 sm:gap-3 animate-shake">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs sm:text-sm text-red-400 flex-1">{error}</p>
               </div>
             )}
 
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
               {/* Username Input with Icon */}
-              <div className="space-y-2 group/input">
-                <label htmlFor="username" className="block text-sm font-medium text-slate-300">
+              <div className="space-y-1.5 sm:space-y-2 group/input">
+                <label htmlFor="username" className="block text-xs sm:text-sm font-medium text-slate-300">
                   Username
                 </label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <User className="w-5 h-5 text-slate-400 group-focus-within:text-blue-400 transition-all duration-300 group-hover:scale-110" />
+                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-focus-within:text-blue-400 transition-all duration-300 group-hover:scale-110" />
                   </div>
                   <input
                     id="username"
@@ -283,7 +284,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Enter your username"
                     disabled={isLoading}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:border-slate-600 hover:bg-slate-800/70"
+                    className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:border-slate-600 hover:bg-slate-800/70"
                     autoComplete="username"
                     required
                   />
@@ -291,13 +292,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </div>
 
               {/* Password Input with Icon */}
-              <div className="space-y-2 group/input">
-                <label htmlFor="password" className="block text-sm font-medium text-slate-300">
+              <div className="space-y-1.5 sm:space-y-2 group/input">
+                <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-slate-300">
                   Password
                 </label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Lock className="w-5 h-5 text-slate-400 group-focus-within:text-blue-400 transition-all duration-300 group-hover:scale-110" />
+                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                    <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-focus-within:text-blue-400 transition-all duration-300 group-hover:scale-110" />
                   </div>
                   <input
                     id="password"
@@ -306,7 +307,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     disabled={isLoading}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:border-slate-600 hover:bg-slate-800/70"
+                    className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:border-slate-600 hover:bg-slate-800/70"
                     autoComplete="current-password"
                     required
                   />
@@ -320,7 +321,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
                   disabled={isLoading}
-                  className="text-sm text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  className="text-xs sm:text-sm text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >
                   Forgot Password?
                 </button>
@@ -330,17 +331,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <Button
                 type="submit"
                 disabled={!username.trim() || !password.trim() || isLoading}
-                className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-700 hover:via-blue-600 hover:to-cyan-700 text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 text-base relative overflow-hidden group/btn"
+                className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-700 hover:via-blue-600 hover:to-cyan-700 text-white font-semibold py-2.5 sm:py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 text-sm sm:text-base relative overflow-hidden group/btn"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Logging in...
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
+                    <span className="text-sm sm:text-base">Logging in...</span>
                   </>
                 ) : (
                   <span className="flex items-center justify-center gap-2">
                     Sign In
-                    <svg className="w-5 h-5 transition-transform group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
                   </span>
@@ -351,8 +352,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-6 animate-fade-in">
-          <p className="text-xs text-slate-500">
+        <div className="text-center mt-4 sm:mt-6 animate-fade-in">
+          <p className="text-[10px] xs:text-xs text-slate-500">
             © 2024 Chairbord Solar. All rights reserved.
           </p>
         </div>
@@ -365,7 +366,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             setShowForgotPassword(false)
             setResetToken(null)
           }}
-          onSuccess={(token) => {
+          onSuccess={(token: string | null) => {
             if (token) {
               setResetToken(token)
               setShowForgotPassword(false)

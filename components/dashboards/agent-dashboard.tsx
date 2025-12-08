@@ -14,8 +14,11 @@ import { authService } from "@/lib/auth"
 import { salesApi, productsApi } from "@/lib/api"
 import { generateQuotationPDF } from "@/lib/quotation-generator"
 import { formatDateISO } from "@/lib/utils"
-import type { Sale, Product } from "@/lib/api"
+import type { Sale as ApiSale, Product } from "@/lib/api"
 import type { StockRequest } from "@/lib/api"
+
+// Type alias for Sale from API (which has snake_case properties)
+type Sale = ApiSale
 
 interface AgentDashboardProps {
   userName: string
@@ -79,8 +82,8 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
   // Backend filters stock requests - agents receive only their own requests
   // Sort requests by date (most recent first)
   const sortedRequests = [...requests.requests].sort((a, b) => {
-    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+    const dateA = (a.requested_date || a.created_at) ? new Date(a.requested_date || a.created_at).getTime() : 0
+    const dateB = (b.requested_date || b.created_at) ? new Date(b.requested_date || b.created_at).getTime() : 0
     return dateB - dateA // Descending order (newest first)
   })
   
@@ -99,10 +102,12 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
   // Backend filters sales - agents receive only their own sales
   // Sort sales by date (most recent first)
   const sortedSales = [...sales.sales].sort((a, b) => {
-    const dateA = a.created_at ? new Date(a.created_at).getTime() : 
-                  a.saleDate ? new Date(a.saleDate).getTime() : 0
-    const dateB = b.created_at ? new Date(b.created_at).getTime() : 
-                  b.saleDate ? new Date(b.saleDate).getTime() : 0
+    const dateA = (a as any).sale_date ? new Date((a as any).sale_date).getTime() :
+                  a.saleDate ? new Date(a.saleDate).getTime() :
+                  a.created_at ? new Date(a.created_at).getTime() : 0
+    const dateB = (b as any).sale_date ? new Date((b as any).sale_date).getTime() :
+                  b.saleDate ? new Date(b.saleDate).getTime() :
+                  b.created_at ? new Date(b.created_at).getTime() : 0
     return dateB - dateA // Descending order (newest first)
   })
 
@@ -111,7 +116,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
     const typeMatch = filterType === "all" || s.type === filterType
     const customerMatch = !salesSearchQuery.trim() || 
       (s.customer_name?.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
-       s.customerName?.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
+       (s as any).customerName?.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
        false)
     return typeMatch && customerMatch
   })
@@ -141,28 +146,28 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
   // Calculate metrics based on sales (backend already filtered - agents only see their own)
   const b2bSales = sales.sales.filter((s) => s.type === "B2B")
   const b2cSales = sales.sales.filter((s) => s.type === "B2C")
-  const totalRevenue = sales.sales.reduce((sum, s) => sum + (s.totalAmount || s.total_amount || 0), 0)
-  const b2bRevenue = b2bSales.reduce((sum, s) => sum + (s.totalAmount || s.total_amount || 0), 0)
-  const b2cRevenue = b2cSales.reduce((sum, s) => sum + (s.totalAmount || s.total_amount || 0), 0)
-  const pendingPayments = sales.sales.filter((s) => s.paymentStatus === "pending").length
-  const completedPayments = sales.sales.filter((s) => s.paymentStatus === "completed").length
+  const totalRevenue = sales.sales.reduce((sum, s) => sum + (s.total_amount || (s as any).totalAmount || 0), 0)
+  const b2bRevenue = b2bSales.reduce((sum, s) => sum + (s.total_amount || (s as any).totalAmount || 0), 0)
+  const b2cRevenue = b2cSales.reduce((sum, s) => sum + (s.total_amount || (s as any).totalAmount || 0), 0)
+  const pendingPayments = sales.sales.filter((s) => (s.payment_status || (s as any).paymentStatus) === "pending").length
+  const completedPayments = sales.sales.filter((s) => (s.payment_status || (s as any).paymentStatus) === "completed").length
   const pendingAmount = sales.sales
-    .filter((s) => s.paymentStatus === "pending")
-    .reduce((sum, s) => sum + (s.totalAmount || s.total_amount || 0), 0)
+    .filter((s) => (s.payment_status || (s as any).paymentStatus) === "pending")
+    .reduce((sum, s) => sum + (s.total_amount || (s as any).totalAmount || 0), 0)
   const averageSaleValue = sales.sales.length > 0 ? Math.round(totalRevenue / sales.sales.length) : 0
   const topProduct =
     sales.sales.length > 0
       ? Object.entries(
           sales.sales.reduce(
             (acc, s) => {
-              const productName = s.productName || s.items?.[0]?.product?.name || "Unknown"
-              const quantity = s.quantity || s.items?.reduce((sum, item) => sum + item.quantity, 0) || 0
+              const productName = (s as any).productName || s.items?.[0]?.product?.name || "Unknown"
+              const quantity = (s as any).quantity || (s.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0)
               acc[productName] = (acc[productName] || 0) + quantity
               return acc
             },
             {} as Record<string, number>,
           ),
-        ).sort(([, a], [, b]) => b - a)[0]
+        ).sort(([, a], [, b]) => (b as number) - (a as number))[0]
       : null
 
   if (sales.loading || requests.loading) {
@@ -185,52 +190,52 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-slate-800 border-slate-700 p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="bg-slate-800 border-slate-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-400 text-sm mb-2">Total Revenue</p>
-              <p className="text-2xl font-bold text-emerald-400">₹{(totalRevenue / 1000).toFixed(1)}K</p>
+              <p className="text-slate-400 text-xs sm:text-sm mb-1 sm:mb-2">Total Revenue</p>
+              <p className="text-xl sm:text-2xl font-bold text-emerald-400">₹{(totalRevenue / 1000).toFixed(1)}K</p>
             </div>
-            <TrendingUp className="w-8 h-8 text-emerald-400 opacity-50" />
+            <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400 opacity-50 flex-shrink-0" />
           </div>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-6">
+        <Card className="bg-slate-800 border-slate-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-400 text-sm mb-2">B2B Sales</p>
-              <p className="text-2xl font-bold text-blue-400">{b2bSales.length}</p>
+              <p className="text-slate-400 text-xs sm:text-sm mb-1 sm:mb-2">B2B Sales</p>
+              <p className="text-xl sm:text-2xl font-bold text-blue-400">{b2bSales.length}</p>
             </div>
-            <Users className="w-8 h-8 text-blue-400 opacity-50" />
+            <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400 opacity-50 flex-shrink-0" />
           </div>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-6">
+        <Card className="bg-slate-800 border-slate-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-400 text-sm mb-2">B2C Sales</p>
-              <p className="text-2xl font-bold text-cyan-400">{b2cSales.length}</p>
+              <p className="text-slate-400 text-xs sm:text-sm mb-1 sm:mb-2">B2C Sales</p>
+              <p className="text-xl sm:text-2xl font-bold text-cyan-400">{b2cSales.length}</p>
             </div>
-            <ShoppingCart className="w-8 h-8 text-cyan-400 opacity-50" />
+            <ShoppingCart className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400 opacity-50 flex-shrink-0" />
           </div>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-6">
+        <Card className="bg-slate-800 border-slate-700 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-400 text-sm mb-2">Pending Payments</p>
-              <p className="text-2xl font-bold text-amber-400">₹{(pendingAmount / 1000).toFixed(1)}K</p>
+              <p className="text-slate-400 text-xs sm:text-sm mb-1 sm:mb-2">Pending Payments</p>
+              <p className="text-xl sm:text-2xl font-bold text-amber-400">₹{(pendingAmount / 1000).toFixed(1)}K</p>
             </div>
-            <CreditCard className="w-8 h-8 text-amber-400 opacity-50" />
+            <CreditCard className="w-6 h-6 sm:w-8 sm:h-8 text-amber-400 opacity-50 flex-shrink-0" />
           </div>
         </Card>
       </div>
 
       {/* Stock Requests Section */}
       {dispatchedRequests.length > 0 && (
-        <Card className="bg-amber-950/30 border-amber-700 border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white font-semibold mb-1">Stock Requests Awaiting Confirmation</p>
-              <p className="text-sm text-slate-400">
+        <Card className="bg-amber-950/30 border-amber-700 border p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-semibold text-sm sm:text-base mb-1">Stock Requests Awaiting Confirmation</p>
+              <p className="text-xs sm:text-sm text-slate-400">
                 You have {dispatchedRequests.length} dispatched request(s) that need confirmation
               </p>
             </div>
@@ -241,7 +246,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                   setShowConfirmationModal(true)
                 }
               }}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm w-full sm:w-auto"
             >
               Confirm Receipt
             </Button>
@@ -250,38 +255,40 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
       )}
 
       {/* Sales Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-xl font-bold text-white">Sales</h2>
-          <div className="flex gap-2">
+      <div className="space-y-3 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <h2 className="text-lg sm:text-xl font-bold text-white">Sales</h2>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
               onClick={() => {
                 setSaleType("b2b")
                 setShowSalesModal(true)
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm py-2 sm:py-2.5"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              New B2B Sale
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+              <span className="hidden xs:inline">New B2B Sale</span>
+              <span className="xs:hidden">B2B Sale</span>
             </Button>
             <Button
               onClick={() => {
                 setSaleType("b2c")
                 setShowSalesModal(true)
               }}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white"
+              className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs sm:text-sm py-2 sm:py-2.5"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              New B2C Sale
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+              <span className="hidden xs:inline">New B2C Sale</span>
+              <span className="xs:hidden">B2C Sale</span>
             </Button>
             <Button
               onClick={() => {
                 setShowStockRequestModal(true)
               }}
               variant="outline"
-              className="border-slate-600 text-slate-300"
+              className="border-slate-600 text-slate-300 text-xs sm:text-sm py-2 sm:py-2.5"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               Request Stock
             </Button>
           </div>
@@ -300,57 +307,59 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
             />
           </div>
           
-          {/* Type Filters */}
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setFilterType("all")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                filterType === "all" ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-              }`}
-            >
-              All Sales
-            </button>
-          <button
-            onClick={() => setFilterType("B2B")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filterType === "B2B" ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-            }`}
-          >
-            B2B
-          </button>
-          <button
-            onClick={() => setFilterType("B2C")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filterType === "B2C" ? "bg-cyan-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-            }`}
-          >
-            B2C
-          </button>
+          {/* Type Filters (make horizontally scrollable on mobile) */}
+          <div className="w-full sm:w-auto overflow-x-auto -mx-1 sm:mx-0 pb-1">
+            <div className="flex gap-2 flex-nowrap px-1 sm:px-0">
+              <button
+                onClick={() => setFilterType("all")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+                  filterType === "all" ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                }`}
+              >
+                All Sales
+              </button>
+              <button
+                onClick={() => setFilterType("B2B")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+                  filterType === "B2B" ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                }`}
+              >
+                B2B
+              </button>
+              <button
+                onClick={() => setFilterType("B2C")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+                  filterType === "B2C" ? "bg-cyan-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                }`}
+              >
+                B2C
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Sales Table */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+        {/* Sales Table - Desktop */}
+        <div className="hidden md:block bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-700/50 border-b border-slate-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Customer</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Type</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Amount</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Payment</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Date</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-300">Actions</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Customer</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Type</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Amount</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Payment</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Date</th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs xl:text-sm font-semibold text-slate-300">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700">
                 {filteredSales.length > 0 ? (
                   filteredSales.map((sale) => (
                     <tr key={sale.id} className="hover:bg-slate-700/30 transition">
-                      <td className="px-6 py-4 text-white font-medium">{sale.customerName || sale.customer_name}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-medium text-xs xl:text-sm">{sale.customer_name || (sale as any).customerName}</td>
+                      <td className="px-4 xl:px-6 py-3 xl:py-4">
                         <span
-                          className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                          className={`px-2 xl:px-3 py-1 text-xs font-semibold rounded-full ${
                             sale.type === "B2B"
                               ? "bg-blue-500/20 text-blue-400 border border-blue-500/50"
                               : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
@@ -359,24 +368,24 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                           {sale.type}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-white font-bold text-emerald-400">
-                        ₹{(sale.totalAmount || sale.total_amount || 0).toLocaleString()}
+                      <td className="px-4 xl:px-6 py-3 xl:py-4 text-white font-bold text-emerald-400 text-xs xl:text-sm">
+                        ₹{(sale.total_amount || (sale as any).totalAmount || 0).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4">
-                        {sale.paymentStatus === "pending" ? (
-                          <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
+                      <td className="px-4 xl:px-6 py-3 xl:py-4">
+                        {(sale.payment_status || (sale as any).paymentStatus) === "pending" ? (
+                          <span className="px-2 xl:px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
                             Pending
                           </span>
                         ) : (
-                          <span className="px-3 py-1 text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/50 rounded-full">
+                          <span className="px-2 xl:px-3 py-1 text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/50 rounded-full">
                             Completed
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-slate-400">
-                        {formatDateISO(sale.saleDate || sale.created_at)}
+                      <td className="px-4 xl:px-6 py-3 xl:py-4 text-slate-400 text-xs xl:text-sm">
+                        {formatDateISO((sale as any).sale_date || sale.saleDate || sale.created_at)}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 xl:px-6 py-3 xl:py-4">
                         <Button
                           size="sm"
                           onClick={() => handleDownloadQuotation(sale)}
@@ -385,10 +394,10 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                           className="border-blue-600 text-blue-400 hover:bg-blue-950 hover:text-blue-400 hover:brightness-110 text-xs"
                         >
                           {downloadingSaleId === sale.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-3 h-3 xl:w-4 xl:h-4 animate-spin" />
                           ) : (
                             <>
-                              <Download className="w-4 h-4 mr-1" />
+                              <Download className="w-3 h-3 xl:w-4 xl:h-4 mr-1" />
                               Quote
                             </>
                           )}
@@ -407,33 +416,104 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
             </table>
           </div>
         </div>
+
+        {/* Sales Cards - Mobile */}
+        <div className="md:hidden space-y-3">
+          {filteredSales.length > 0 ? (
+            filteredSales.map((sale) => (
+              <Card key={sale.id} className="bg-slate-800 border-slate-700 p-4">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold text-sm truncate">{sale.customer_name || (sale as any).customerName}</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {formatDateISO((sale as any).sale_date || sale.saleDate || sale.created_at)}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${
+                        sale.type === "B2B"
+                          ? "bg-blue-500/20 text-blue-400 border border-blue-500/50"
+                          : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
+                      }`}
+                    >
+                      {sale.type}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-700">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Amount</p>
+                      <p className="text-sm font-bold text-emerald-400">
+                        ₹{(sale.total_amount || (sale as any).totalAmount || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Payment</p>
+                      {(sale.payment_status || (sale as any).paymentStatus) === "pending" ? (
+                        <span className="inline-block px-2 py-1 text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/50 rounded-full">
+                          Pending
+                        </span>
+                      ) : (
+                        <span className="inline-block px-2 py-1 text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/50 rounded-full">
+                          Completed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    onClick={() => handleDownloadQuotation(sale)}
+                    disabled={downloadingSaleId === sale.id}
+                    variant="outline"
+                    className="w-full border-blue-600 text-blue-400 hover:bg-blue-950 hover:text-blue-400 hover:brightness-110 text-xs"
+                  >
+                    {downloadingSaleId === sale.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-1" />
+                        Download Quote
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </Card>
+            ))
+          ) : (
+            <Card className="bg-slate-800 border-slate-700 p-8 text-center">
+              <p className="text-slate-400">No sales found</p>
+            </Card>
+          )}
+        </div>
       </div>
 
       {/* Sales Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-slate-800 border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <Card className="bg-slate-800 border-slate-700 p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
             <span className="text-xs text-slate-400">B2B Revenue</span>
           </div>
-          <p className="text-2xl font-bold text-white">₹{(b2bRevenue / 1000).toFixed(1)}K</p>
+          <p className="text-xl sm:text-2xl font-bold text-white">₹{(b2bRevenue / 1000).toFixed(1)}K</p>
           <p className="text-xs text-slate-400 mt-1">{b2bSales.length} transactions</p>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <Target className="w-5 h-5 text-cyan-400" />
+        <Card className="bg-slate-800 border-slate-700 p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <Target className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
             <span className="text-xs text-slate-400">B2C Revenue</span>
           </div>
-          <p className="text-2xl font-bold text-white">₹{(b2cRevenue / 1000).toFixed(1)}K</p>
+          <p className="text-xl sm:text-2xl font-bold text-white">₹{(b2cRevenue / 1000).toFixed(1)}K</p>
           <p className="text-xs text-slate-400 mt-1">{b2cSales.length} transactions</p>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <TrendingUp className="w-5 h-5 text-emerald-400" />
+        <Card className="bg-slate-800 border-slate-700 p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
             <span className="text-xs text-slate-400">Avg. Sale Value</span>
           </div>
-          <p className="text-2xl font-bold text-white">₹{averageSaleValue.toLocaleString()}</p>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xl sm:text-2xl font-bold text-white">₹{averageSaleValue.toLocaleString()}</p>
+          <p className="text-xs text-slate-400 mt-1 truncate">
             {topProduct ? `Top: ${topProduct[0]}` : "No sales yet"}
           </p>
         </Card>
@@ -441,9 +521,9 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
 
       {/* Stock Requests */}
       {filteredAndSortedRequests.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <h2 className="text-xl font-bold text-white">My Stock Requests</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-white">My Stock Requests</h2>
           </div>
           
           {/* Search for Stock Requests */}
@@ -454,7 +534,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
               placeholder="Search requests by user or notes..."
               value={requestsSearchQuery}
               onChange={(e) => setRequestsSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 text-sm bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
             />
           </div>
           
@@ -462,7 +542,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
             {filteredAndSortedRequests.slice(0, 5).map((request) => (
               <Card
                 key={request.id}
-                className={`border-l-4 p-3 ${
+                className={`border-l-4 p-3 sm:p-4 ${
                   request.status === "pending"
                     ? "bg-amber-950/30 border-l-amber-500"
                     : request.status === "dispatched"
@@ -472,19 +552,19 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                         : "bg-red-950/30 border-l-red-500"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-white font-medium text-sm">
-                      {request.items?.[0]?.product?.name || "Multiple Products"}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium text-sm truncate">
+                      {request.primary_product_name || request.items?.[0]?.product?.name || "Multiple Products"}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-400 mt-1">
                       Qty: {request.items?.reduce((sum, item) => sum + item.quantity, 0) || 0} •{" "}
-                      {formatDateISO(request.created_at)}
+                      {formatDateISO(request.requested_date || request.created_at)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
                     <span
-                      className={`px-2 py-1 text-xs font-semibold rounded ${
+                      className={`px-2 py-1 text-xs font-semibold rounded flex-shrink-0 ${
                         request.status === "pending"
                           ? "bg-amber-500 text-amber-950"
                           : request.status === "dispatched"
@@ -503,7 +583,7 @@ export default function AgentDashboard({ userName }: AgentDashboardProps) {
                           setSelectedRequest(request)
                           setShowConfirmationModal(true)
                         }}
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs flex-1 sm:flex-initial"
                       >
                         Confirm
                       </Button>

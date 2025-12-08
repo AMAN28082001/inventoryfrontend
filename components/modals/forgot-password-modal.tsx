@@ -2,15 +2,15 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, Loader2, X, CheckCircle2 } from "lucide-react"
+import { AlertCircle, Loader2, X, CheckCircle2, User } from "lucide-react"
 import { authApi } from "@/lib/api"
 
 interface ForgotPasswordModalProps {
   onClose: () => void
-  onSuccess?: (resetToken?: string) => void // Optional callback with reset token
+  onSuccess?: (token: string | null) => void // Optional callback with reset token
 }
 
-export default function ForgotPasswordModal({ onClose, onSuccess }: ForgotPasswordModalProps) {
+function ForgotPasswordModal({ onClose, onSuccess }: ForgotPasswordModalProps) {
   const [username, setUsername] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,36 +20,40 @@ export default function ForgotPasswordModal({ onClose, onSuccess }: ForgotPasswo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (!username.trim()) {
+      setError("Username is required")
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      if (!username.trim()) {
-        setError("Please enter your username")
-        setIsLoading(false)
-        return
-      }
-
       const response = await authApi.forgotPassword(username.trim())
       setSuccess(true)
-      // Store reset token if provided (for development/testing)
-      if (response.resetToken) {
-        setResetToken(response.resetToken)
+      
+      // If the API returns a token (for development/testing), store it
+      // In production, this would typically be sent via email
+      if (response.token) {
+        setResetToken(response.token)
       }
+      
+      // Call onSuccess with token if available
       if (onSuccess) {
-        onSuccess(response.resetToken)
+        setTimeout(() => {
+          onSuccess(response.token || null)
+        }, 1500)
       }
     } catch (err: any) {
       console.error("Forgot password error:", err)
-      let errorMessage = "Failed to process request. Please try again."
+      let errorMessage = "Failed to send reset link. Please try again."
       
       if (err && typeof err.status === 'number') {
         const apiError = err.data?.error || err.message || ""
-        if (err.status === 401) {
-          errorMessage = apiError || "Account is inactive. Please contact administrator."
-        } else if (err.status === 404) {
-          // For security, don't reveal if user exists or not
-          errorMessage = "If the username exists, a password reset token has been generated."
-          setSuccess(true) // Still show success for security
+        if (err.status === 404) {
+          errorMessage = "Username not found. Please check and try again."
+        } else if (err.status === 400) {
+          errorMessage = apiError || "Invalid request. Please check your username."
         } else {
           errorMessage = apiError || errorMessage
         }
@@ -68,10 +72,10 @@ export default function ForgotPasswordModal({ onClose, onSuccess }: ForgotPasswo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl w-full max-w-[95%] sm:max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Forgot Password</h2>
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Forgot Password</h2>
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-white transition-colors"
@@ -86,96 +90,80 @@ export default function ForgotPasswordModal({ onClose, onSuccess }: ForgotPasswo
               <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm text-green-400 font-medium">
-                    Password reset token has been generated successfully!
+                  <p className="text-sm sm:text-base text-green-400 font-medium">
+                    Reset link sent successfully!
                   </p>
-                  {resetToken && (
-                    <div className="mt-3 p-3 bg-slate-700 rounded border border-slate-600">
-                      <p className="text-xs text-slate-300 mb-2">Reset Token (for testing):</p>
-                      <p className="text-xs text-white font-mono break-all bg-slate-900 p-2 rounded">
-                        {resetToken}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-2">
-                        In production, this token would be sent via email.
-                      </p>
-                    </div>
-                  )}
-                  <p className="text-xs text-slate-400 mt-3">
-                    Please check your email for the reset token. If you don't receive an email, please contact your administrator.
+                  <p className="text-xs sm:text-sm text-slate-400 mt-2">
+                    {resetToken 
+                      ? `Reset token: ${resetToken} (for development only)`
+                      : "Please check your email for password reset instructions."
+                    }
                   </p>
                 </div>
               </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={onClose}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white"
-                >
-                  Close
-                </Button>
-                {resetToken && (
-                  <Button
-                    onClick={() => {
-                      onClose()
-                      // You can trigger reset password modal here if needed
-                    }}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Reset Password
-                  </Button>
-                )}
-              </div>
+              <Button
+                onClick={onClose}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base"
+              >
+                Close
+              </Button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <p className="text-slate-400 text-sm mb-4">
-                Enter your username and we'll send you a password reset token.
+              <p className="text-slate-400 text-xs sm:text-sm mb-4">
+                Enter your username to receive a password reset link.
               </p>
 
               {error && (
-                <div className="p-4 bg-red-900/20 border border-red-700 rounded-lg flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-400">{error}</p>
+                <div className="p-3 sm:p-4 bg-red-900/20 border border-red-700 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs sm:text-sm text-red-400">{error}</p>
                 </div>
               )}
 
               <div>
-                <label htmlFor="forgot-username" className="block text-sm font-medium text-slate-300 mb-2">
+                <label htmlFor="username" className="block text-xs sm:text-sm font-medium text-slate-300 mb-2">
                   Username
                 </label>
-                <input
-                  id="forgot-username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
-                  disabled={isLoading}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  autoComplete="username"
-                  required
-                />
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your username"
+                    disabled={isLoading}
+                    className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-2.5 text-sm sm:text-base bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    autoComplete="username"
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button
                   type="button"
                   onClick={onClose}
                   disabled={isLoading}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white"
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm sm:text-base"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={!username.trim() || isLoading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
+                      Sending...
                     </>
                   ) : (
-                    "Send Reset Token"
+                    "Send Reset Link"
                   )}
                 </Button>
               </div>
@@ -187,3 +175,4 @@ export default function ForgotPasswordModal({ onClose, onSuccess }: ForgotPasswo
   )
 }
 
+export default ForgotPasswordModal

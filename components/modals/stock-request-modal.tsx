@@ -219,3 +219,653 @@ export default function StockRequestModal({ onClose, onSuccess }: StockRequestMo
     </div>
   )
 }
+
+                className="border-slate-600 text-slate-300 bg-transparent"
+              >
+                Add Product
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                  <select
+                    value={item.product_id}
+                    onChange={(e) => updateItem(index, "product_id", e.target.value)}
+                    className="flex-1 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    required
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} - {product.model}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <input
+                      type="number"
+                      value={item.quantity || ""}
+                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
+                      placeholder="Qty"
+                      min="1"
+                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-600 text-red-400 hover:bg-red-950 flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {items.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Click "Add Product" to add items</p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
+              placeholder="Additional notes or special instructions..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 bg-transparent"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Request"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
+}
+
+                className="border-slate-600 text-slate-300 bg-transparent"
+              >
+                Add Product
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                  <select
+                    value={item.product_id}
+                    onChange={(e) => updateItem(index, "product_id", e.target.value)}
+                    className="flex-1 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    required
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} - {product.model}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <input
+                      type="number"
+                      value={item.quantity || ""}
+                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
+                      placeholder="Qty"
+                      min="1"
+                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-600 text-red-400 hover:bg-red-950 flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {items.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Click "Add Product" to add items</p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
+              placeholder="Additional notes or special instructions..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 bg-transparent"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Request"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
+}
+
+                className="border-slate-600 text-slate-300 bg-transparent"
+              >
+                Add Product
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                  <select
+                    value={item.product_id}
+                    onChange={(e) => updateItem(index, "product_id", e.target.value)}
+                    className="flex-1 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    required
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} - {product.model}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <input
+                      type="number"
+                      value={item.quantity || ""}
+                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
+                      placeholder="Qty"
+                      min="1"
+                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-600 text-red-400 hover:bg-red-950 flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {items.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Click "Add Product" to add items</p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
+              placeholder="Additional notes or special instructions..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 bg-transparent"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Request"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
+}
+                className="border-slate-600 text-slate-300 bg-transparent"
+              >
+                Add Product
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                  <select
+                    value={item.product_id}
+                    onChange={(e) => updateItem(index, "product_id", e.target.value)}
+                    className="flex-1 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    required
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} - {product.model}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <input
+                      type="number"
+                      value={item.quantity || ""}
+                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
+                      placeholder="Qty"
+                      min="1"
+                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-600 text-red-400 hover:bg-red-950 flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {items.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Click "Add Product" to add items</p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
+              placeholder="Additional notes or special instructions..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 bg-transparent"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Request"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
+}
+
+                className="border-slate-600 text-slate-300 bg-transparent"
+              >
+                Add Product
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                  <select
+                    value={item.product_id}
+                    onChange={(e) => updateItem(index, "product_id", e.target.value)}
+                    className="flex-1 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    required
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} - {product.model}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <input
+                      type="number"
+                      value={item.quantity || ""}
+                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
+                      placeholder="Qty"
+                      min="1"
+                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-600 text-red-400 hover:bg-red-950 flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {items.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Click "Add Product" to add items</p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
+              placeholder="Additional notes or special instructions..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 bg-transparent"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Request"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
+}
+
+                className="border-slate-600 text-slate-300 bg-transparent"
+              >
+                Add Product
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                  <select
+                    value={item.product_id}
+                    onChange={(e) => updateItem(index, "product_id", e.target.value)}
+                    className="flex-1 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    required
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} - {product.model}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <input
+                      type="number"
+                      value={item.quantity || ""}
+                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
+                      placeholder="Qty"
+                      min="1"
+                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-600 text-red-400 hover:bg-red-950 flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {items.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Click "Add Product" to add items</p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
+              placeholder="Additional notes or special instructions..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 bg-transparent"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Request"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
+}
+
+                className="border-slate-600 text-slate-300 bg-transparent"
+              >
+                Add Product
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3 bg-slate-700/30 rounded-lg">
+                  <select
+                    value={item.product_id}
+                    onChange={(e) => updateItem(index, "product_id", e.target.value)}
+                    className="flex-1 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    required
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} - {product.model}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <input
+                      type="number"
+                      value={item.quantity || ""}
+                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
+                      placeholder="Qty"
+                      min="1"
+                      className="w-24 sm:w-28 px-3 sm:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-600 text-red-400 hover:bg-red-950 flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {items.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Click "Add Product" to add items</p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none h-20"
+              placeholder="Additional notes or special instructions..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="outline"
+              className="flex-1 border-slate-600 text-slate-300 bg-transparent"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Request"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
+}

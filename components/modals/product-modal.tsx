@@ -15,11 +15,16 @@ interface ProductModalProps {
 }
 
 export default function ProductModal({ product, onClose, onSave }: ProductModalProps) {
+  // Component for adding/editing products
   const [categories, setCategories] = useState<string[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
+  const [isAddingCategory, setIsAddingCategory] = useState(false)
+  const [showProductDropdown, setShowProductDropdown] = useState(false)
   
   // Check if user is agent (only agents can set price)
   const currentUser = authService.getUser()
@@ -36,15 +41,66 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
   })
 
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadData = async () => {
       try {
-        const cats = await categoriesApi.getAll()
-        setCategories(cats.map(c => c.label))
+        // Load reference data from JSON file
+        const response = await fetch('/PRODUCT_CATALOG_REFERENCE.json')
+        const referenceData = await response.json()
+        
+        // Extract unique categories from reference data
+        const referenceCategories: string[] = Array.from(new Set(referenceData.map((item: any) => item.category as string)))
+          .filter((cat): cat is string => typeof cat === 'string' && cat.trim() !== '')
+        
+        // Try to load categories from API, fallback to reference data
+        let apiCategories: string[] = []
+        try {
+          const cats = await categoriesApi.getAll()
+          apiCategories = cats.map(c => c.label).filter((cat): cat is string => typeof cat === 'string' && cat.trim() !== '')
+        } catch (apiErr) {
+          console.log("API categories not available, using reference data")
+        }
+        
+        // Combine API categories with reference categories (API takes priority)
+        // Filter out any empty strings or invalid values
+        const allCategories: string[] = Array.from(new Set([...apiCategories, ...referenceCategories]))
+          .filter((cat): cat is string => typeof cat === 'string' && cat.trim() !== '')
+        setCategories(allCategories)
+        
+        // Try to load products from API, fallback to reference data
+        let apiProducts: Product[] = []
+        try {
+          const prods = await productsApi.getAll()
+          apiProducts = prods.sort((a, b) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+            return dateB - dateA // Newest first
+          })
+        } catch (apiErr) {
+          console.log("API products not available, using reference data")
+        }
+        
+        // Map reference data to Product format
+        const referenceProducts: Product[] = referenceData.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          model: item.name, // Use name as model fallback
+          category: item.category,
+          unit_price: item.rate || 0,
+          price: item.rate || 0,
+          quantity: 0,
+          central_stock: 0,
+        }))
+        
+        // Combine API products with reference products (API takes priority)
+        const allProducts = [...apiProducts, ...referenceProducts.filter(rp => 
+          !apiProducts.some(ap => ap.id === rp.id || ap.name === rp.name)
+        )]
+        setProducts(allProducts)
       } catch (err) {
-        console.error("Failed to load categories:", err)
+        console.error("Failed to load data:", err)
       }
     }
-    loadCategories()
+    loadData()
   }, [])
 
   useEffect(() => {
@@ -53,12 +109,83 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
     }
   }, [product])
 
+  // Filter products based on selected category
+  const filteredProducts = formData.category 
+    ? products.filter(p => p.category === formData.category)
+    : products
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({
+    setFormData((prev) => {
+      const newData = {
+        ...prev,
+        [name]: name === "price" || name === "quantity" ? Number.parseFloat(value) || 0 : value,
+      }
+      // Clear product name when category changes
+      if (name === "category" && value !== prev.category) {
+        newData.name = ""
+      }
+      // Show dropdown when typing in category field
+      if (name === "category") {
+        setShowCategoryDropdown(true)
+        setIsAddingCategory(value.trim() !== "" && !categories.includes(value.trim()))
+      }
+      // Show dropdown when typing in product name field
+      if (name === "name") {
+        setShowProductDropdown(true)
+      }
+      return newData
+    })
+  }
+
+  const handleAddCategory = async () => {
+    const categoryName = formData.category.trim()
+    if (!categoryName) return
+
+    try {
+      setIsAddingCategory(true)
+      await categoriesApi.create(categoryName)
+      // Refresh categories list
+      const updatedCats = await categoriesApi.getAll()
+      const sortedCategories = [...updatedCats].sort((a: any, b: any) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return dateB - dateA // Newest first
+      })
+      setCategories(sortedCategories.map(c => c.label))
+      setIsAddingCategory(false)
+      setShowCategoryDropdown(false)
+    } catch (err) {
+      console.error("Failed to create category:", err)
+      setIsAddingCategory(false)
+    }
+  }
+
+  const handleSelectCategory = (category: string) => {
+    setFormData(prev => ({
       ...prev,
-      [name]: name === "price" || name === "quantity" ? Number.parseFloat(value) || 0 : value,
+      category,
+      name: "" // Clear product name when category changes
     }))
+    setShowCategoryDropdown(false)
+  }
+
+  const handleSelectProduct = (productName: string) => {
+    const selectedProduct = filteredProducts.find(p => p.name === productName)
+    if (selectedProduct) {
+      setFormData(prev => ({
+        ...prev,
+        name: selectedProduct.name,
+        model: selectedProduct.model || selectedProduct.name,
+        wattage: selectedProduct.wattage || prev.wattage,
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        name: productName
+      }))
+    }
+    setShowProductDropdown(false)
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,10 +215,30 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
     setLoading(true)
 
     try {
+      const categoryName = formData.category.trim()
+      // Category should already be created via Add button, but if it's new, try to create it
+      if (categoryName && !categories.includes(categoryName)) {
+        try {
+          await categoriesApi.create(categoryName)
+          // Refresh categories list
+          const updatedCats = await categoriesApi.getAll()
+          const sortedCategories = [...updatedCats].sort((a: any, b: any) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+            return dateB - dateA // Newest first
+          })
+          setCategories(sortedCategories.map(c => c.label))
+        } catch (catErr) {
+          // Category creation might fail if backend auto-creates categories
+          // or if category already exists. Continue with product creation.
+          console.log("Category may already exist or will be auto-created:", catErr)
+        }
+      }
+
       const productData: any = {
         name: formData.name,
         model: formData.model,
-        category: formData.category,
+        category: categoryName,
         wattage: formData.wattage || undefined,
         quantity: formData.quantity || 0,
         image: imageFile || undefined,
@@ -115,6 +262,14 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
       } else {
         // Create new product
         const created = await productsApi.create(productData)
+        // Refresh products list and add new product at the top
+        const updatedProds = await productsApi.getAll()
+        const sortedProducts = [...updatedProds].sort((a, b) => {
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+          return dateB - dateA // Newest first
+        })
+        setProducts(sortedProducts)
         onSave(created)
       }
       onClose()
@@ -143,16 +298,165 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Product Name *</label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-              required
-            />
+          <div className="relative">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Category * 
+              <span className="text-xs text-slate-400 ml-2 font-normal">(Type to search or create new)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                onFocus={() => setShowCategoryDropdown(true)}
+                onBlur={() => {
+                  // Delay to allow button click
+                  setTimeout(() => setShowCategoryDropdown(false), 200)
+                }}
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                placeholder="e.g., Solar Panels, Inverters, Cables - DC, Meters"
+                autoComplete="off"
+                required
+              />
+              {showCategoryDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                  {categories.length > 0 ? (
+                    <>
+                      {categories
+                        .filter(cat => 
+                          cat && cat.trim() !== '' &&
+                          (!formData.category || 
+                          cat.toLowerCase().includes(formData.category.toLowerCase()))
+                        )
+                        .map((cat, idx) => (
+                          <button
+                            key={`${cat}-${idx}`}
+                            type="button"
+                            onClick={() => handleSelectCategory(cat)}
+                            className="w-full text-left px-4 py-2 text-sm text-white hover:bg-slate-700 transition-colors"
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                    </>
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-slate-400">
+                      Loading categories...
+                    </div>
+                  )}
+                  {formData.category && 
+                   !categories.includes(formData.category) && 
+                   formData.category.trim() !== "" && (
+                    <div className="border-t border-slate-600">
+                      <button
+                        type="button"
+                        onClick={handleAddCategory}
+                        disabled={isAddingCategory}
+                        className="w-full text-left px-4 py-2 text-sm text-blue-400 hover:bg-slate-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isAddingCategory ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-lg">+</span>
+                            Add "{formData.category}"
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  {categories.length === 0 && !formData.category && (
+                    <div className="px-4 py-2 text-sm text-slate-400">
+                      No categories found. Type a category name and click "Add" to create one.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              {formData.category && !categories.includes(formData.category) 
+                ? "💡 Click the 'Add' button in the dropdown to create this category"
+                : "Select from existing categories or type a new category name and click 'Add'"}
+            </p>
+          </div>
+
+          <div className="relative">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Product Name * 
+              <span className="text-xs text-slate-400 ml-2 font-normal">(Type to search or create new)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                onFocus={() => formData.category && setShowProductDropdown(true)}
+                onBlur={() => {
+                  // Delay to allow button click
+                  setTimeout(() => setShowProductDropdown(false), 200)
+                }}
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder={formData.category ? `e.g., Products from ${formData.category}` : "e.g., ADANI SOLAR PANEL 545 WATT(DCR)"}
+                autoComplete="off"
+                required
+                disabled={!formData.category}
+              />
+              {showProductDropdown && formData.category && (
+                <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                  {filteredProducts.length > 0 ? (
+                    <>
+                      {filteredProducts
+                        .filter(prod => 
+                          prod.name && prod.name.trim() !== '' &&
+                          (!formData.name || 
+                          prod.name.toLowerCase().includes(formData.name.toLowerCase()))
+                        )
+                        .map((prod) => (
+                          <button
+                            key={prod.id}
+                            type="button"
+                            onClick={() => handleSelectProduct(prod.name)}
+                            className="w-full text-left px-4 py-2 text-sm text-white hover:bg-slate-700 transition-colors"
+                          >
+                            {prod.name}
+                          </button>
+                        ))}
+                      {formData.name && 
+                       !filteredProducts.some(p => p.name === formData.name) && 
+                       formData.name.trim() !== "" && (
+                        <div className="border-t border-slate-600">
+                          <div className="px-4 py-2 text-xs text-slate-400">
+                            💡 This is a new product. Fill in the details below and click "Create Product".
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-slate-400">
+                      {formData.category && !categories.includes(formData.category)
+                        ? "This is a new category. Type a product name to create it."
+                        : "No products found in this category. Type a product name to create a new one."}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              {!formData.category 
+                ? "⚠️ Please select a category first"
+                : filteredProducts.length === 0 
+                  ? formData.category && !categories.includes(formData.category)
+                    ? "💡 This is a new category - you can type a new product name"
+                    : "No products found in this category"
+                  : formData.name && !filteredProducts.some(p => p.name === formData.name) 
+                    ? "💡 This is a new product name - fill in details and create"
+                    : `Select from ${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''} in "${formData.category}" or type a new product name`}
+            </p>
           </div>
 
           <div>
@@ -180,98 +484,74 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Category *</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Quantity *</label>
             <input
-              type="text"
-              name="category"
-              value={formData.category}
+              type="number"
+              name="quantity"
+              value={formData.quantity}
               onChange={handleChange}
               className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-              placeholder="e.g., Panels, Inverter, Battery"
-              list="categories"
+              min="0"
               required
             />
-            <datalist id="categories">
-              {categories.map((cat) => (
-                <option key={cat} value={cat} />
-              ))}
-            </datalist>
           </div>
 
-          <div className={`grid grid-cols-1 ${isAgent ? 'sm:grid-cols-2' : ''} gap-4`}>
-            {isAgent && (
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Unit Price (₹) *</label>
-                <input
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  step="0.01"
-                  min="0"
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                  required
-                />
-              </div>
-            )}
+          {isAgent && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Quantity *</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Unit Price (₹) *</label>
               <input
                 type="number"
-                name="quantity"
-                value={formData.quantity}
+                name="price"
+                value={formData.price}
                 onChange={handleChange}
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 min="0"
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                step="0.01"
                 required
               />
             </div>
-          </div>
+          )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Product Image (Optional)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Product Image</label>
             {imagePreview && (
-              <div className="mb-2 relative w-full h-32 rounded-lg overflow-hidden border border-slate-600">
-                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImageFile(null)
-                    setImagePreview(null)
-                  }}
-                  className="absolute top-2 right-2 p-1 bg-red-600 rounded-full hover:bg-red-700"
-                >
-                  <X className="w-4 h-4 text-white" />
-                </button>
+              <div className="mb-2">
+                <img
+                  src={imagePreview}
+                  alt="Product preview"
+                  className="w-32 h-32 object-cover rounded-lg border border-slate-600"
+                />
               </div>
             )}
             <input
               type="file"
               accept="image/*"
               onChange={handleImageChange}
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
             />
-            <p className="text-xs text-slate-500 mt-1">PNG, JPG, GIF up to 5MB</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-700">
             <Button
               type="button"
               onClick={onClose}
               variant="outline"
-              className="flex-1 border-slate-600 text-slate-300 bg-transparent"
-              disabled={loading}
+              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
             >
               Cancel
             </Button>
-            <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (
-                "Save Product"
+                product ? "Update Product" : "Create Product"
               )}
             </Button>
           </div>

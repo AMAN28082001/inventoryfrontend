@@ -56,6 +56,30 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
   // Tab state
   const [activeTab, setActiveTab] = useState<string>("overview")
 
+  // Helper function to format product names from request items
+  const formatProductNames = (request: StockRequest): string => {
+    // Prioritize primary_product_name from the request
+    if (request.primary_product_name) {
+      return request.primary_product_name
+    }
+    
+    // Fallback to extracting from items
+    if (!request.items || request.items.length === 0) {
+      return "No Products"
+    }
+    const productNames = request.items
+      .map(item => item.product?.name)
+      .filter((name): name is string => !!name)
+    
+    if (productNames.length === 0) {
+      return "Unknown Products"
+    }
+    
+    // Remove duplicates and join with commas
+    const uniqueNames = [...new Set(productNames)]
+    return uniqueNames.join(", ")
+  }
+
   // Load categories
   useEffect(() => {
     const loadCategories = async () => {
@@ -533,7 +557,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <p className="font-semibold text-white text-sm">
-                      {request.items?.[0]?.product?.name || "Multiple Products"}
+                      {formatProductNames(request)}
                     </p>
                     <p className="text-xs text-slate-400">From: {request.requested_by_name || "Admin"}</p>
                   </div>
@@ -616,7 +640,7 @@ export default function SuperAdminDashboard({ userName }: SuperAdminDashboardPro
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <p className="font-semibold text-white text-sm">
-                    {request.items?.[0]?.product?.name || "Multiple Products"}
+                    {formatProductNames(request)}
                   </p>
                   <p className="text-xs text-slate-400">From: {request.requested_by_name || "Admin"}</p>
                 </div>
